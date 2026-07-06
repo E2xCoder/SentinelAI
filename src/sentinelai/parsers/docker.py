@@ -1,0 +1,73 @@
+"""Parser for the Docker daemon log (logfmt style).
+
+Example line::
+
+    time="2024-01-07T03:14:15.123456789Z" level=info msg="Container started"
+"""
+
+from __future__ import annotations
+
+import re
+
+from sentinelai.core.models import EventCategory, EventType, LogEvent, Severity
+from sentinelai.parsers.base import LogParser, register_parser
+from sentinelai.utils.timeparse import parse_iso_timestamp
+
+_LINE = re.compile(
+    r'^time="(?P<ts>[^"]+)"\s+level=(?P<level>\w+)\s+msg="?(?P<msg>.*?)"?\s*$'
+)
+
+_FIELD = re.compile(r'(\w+)=(?:"([^"]*)"|(\S+))')
+
+_LEVEL_SEVERITY = {
+    "fatal": Severity.CRITICAL,
+    "panic": Severity.CRITICAL,
+    "error": Severity.ERROR,
+    "warning": Severity.WARNING,
+    "warn": Severity.WARNING,
+    "info": Severity.INFO,
+    "debug": Severity.DEBUG,
+}
+
+_CONTAINER_ID = re.compile(r"container(?:=|\s+)(?P<cid>[0-9a-f]{12,64})")
+_PRIVILEGED = re.compile(r"privileged", re.IGNORECASE)
+
+
+@register_parser
+class DockerParser(LogParser):
+    """Docker daemon (dockerd) log parser."""
+
+    name = "docker"
+    description = "Docker daemon log (logfmt)"
+    filename_hints = ("docker",)
+
+    def match_score(self, sample_lines: list[str]) -> float:
+        if not sample_lines:
+            return 0.0
+        return sum(1 for line in sample_lines if _LINE.match(line)) / len(sample_lines)
+
+    def parse_line(self, line: str) -> LogEvent | None:
+        match = _LINE.match(line)
+        if not match:
+            return None
+        timestamp = parse_iso_timestamp(match.group("ts"))
+        if timestamp is None:
+            return None
+        message = match.group("msg")
+        level = match.group("level").lower()
+        extra: dict[str, object] = {"level": level}
+        cid = _CONTAINER_ID.search(line)
+        if cid:
+            extra["container_id"] = cid.group("cid")
+        if _PRIVILEGED.search(line):
+            extra["privileged"] = True
+        return LogEvent(
+            timestamp=timestamp,
+            message=message,
+            raw=line,
+            service="docker",
+            event_type=EventType.CONTAINER_EVENT,
+            category=EventCategory.DOCKER,
+            severity=_LEVEL_SEVERITY.get(level, Severity.INFO),
+            extra=extra,
+        )

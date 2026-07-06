@@ -1,0 +1,183 @@
+# =============================================================================
+# SentinelAI — example configuration
+# =============================================================================
+# Copy this file to `config.yaml` (kept out of git) and edit as needed.
+# SentinelAI runs with sensible defaults, so every key below is OPTIONAL —
+# uncomment only what you want to change.
+#
+# Config is discovered in this order (first match wins):
+#   1. --config <path>
+#   2. $SENTINELAI_CONFIG
+#   3. ./config.yaml   ./sentinelai.yaml
+#   4. ~/.sentinelai/config.yaml
+#   5. /etc/sentinelai/config.yaml
+#
+# ANY value can be overridden by an environment variable named
+# SENTINELAI_<SECTION>_<KEY> (nested sections are underscore-joined), e.g.:
+#   SENTINELAI_INTEL_ABUSEIPDB_API_KEY=xxxx
+#   SENTINELAI_RESPONSE_ENABLED=true
+# Environment variables win over the file, so API keys need never touch disk.
+# =============================================================================
+
+# Directory for runtime state (alert DB, TI cache, saved models).
+# Default: ~/.sentinelai  (override with $SENTINELAI_STATE_DIR)
+state_dir: "~/.sentinelai"
+
+# Emit verbose internal logs to stderr.
+debug: false
+
+# Optional file to append structured internal logs to (empty = disabled).
+log_file: ""
+
+# -----------------------------------------------------------------------------
+# Detection thresholds (the rule engine)
+# -----------------------------------------------------------------------------
+detection:
+  # SSH brute force: N failures from one IP within the window.
+  brute_force_attempts: 5
+  brute_force_window_seconds: 300
+
+  # Password spraying: one IP hitting N distinct accounts.
+  password_spray_users: 4
+  password_spray_window_seconds: 600
+
+  # Credential stuffing: one account hit by N failures from >=3 IPs.
+  credential_stuffing_attempts: 8
+  credential_stuffing_window_seconds: 300
+
+  # Sustained failures against a single account.
+  repeated_failure_attempts: 10
+  repeated_failure_window_seconds: 900
+
+  # Port scan: one IP blocked across N distinct ports.
+  port_scan_ports: 10
+  port_scan_window_seconds: 60
+
+  # Impossible frequency: N attempts within a very short window (bots).
+  impossible_frequency_attempts: 10
+  impossible_frequency_window_seconds: 10
+
+  # Quiet hours (UTC) that make a successful login suspicious (inclusive).
+  suspicious_hours_start: 0
+  suspicious_hours_end: 5
+
+  # Merge duplicate alerts (same rule+ip+user+host) within this window.
+  alert_cooldown_seconds: 300
+
+  # Optionally restrict which rules run. Leave empty to run all rules.
+  enabled_rules: []          # e.g. ["R001", "R005", "R031"]
+  disabled_rules: []         # e.g. ["R007"]
+
+  # R020 (New User Created) — service account filtering.
+  # UID_MIN is read from /etc/login.defs at runtime (default 1000 if
+  # unavailable). Set uid_min > 0 here to override.
+  uid_min: 0                 # 0 = auto-detect from /etc/login.defs
+
+  # Extra service-account patterns to suppress beyond the built-in list
+  # (sshd, www-data, systemd-*, mysql, postgres, etc.). Shell-style
+  # wildcards are supported (*, ?).
+  service_account_allowlist: []   # e.g. ["myapp-*", "deploy", "ci-runner"]
+
+# -----------------------------------------------------------------------------
+# Threat intelligence (all providers OFF by default)
+# -----------------------------------------------------------------------------
+intel:
+  enabled: true
+  cache_ttl_seconds: 86400   # cache verdicts on disk for 24h
+  timeout_seconds: 10.0
+  max_lookups_per_run: 50    # per-run budget to protect free-tier quotas
+
+  abuseipdb:
+    enabled: false
+    api_key: ""              # prefer SENTINELAI_INTEL_ABUSEIPDB_API_KEY
+    requests_per_minute: 4
+
+  virustotal:
+    enabled: false
+    api_key: ""
+    requests_per_minute: 4
+
+  otx:
+    enabled: false
+    api_key: ""
+    requests_per_minute: 10
+
+# -----------------------------------------------------------------------------
+# AI engine (anomaly detection needs the [ai] extra: pip install 'sentinelai[ai]')
+# -----------------------------------------------------------------------------
+ai:
+  enabled: true
+  model: "isolation_forest"       # any registered anomaly model
+  contamination: 0.02             # expected outlier fraction (0 < x < 0.5)
+  min_events: 50                  # minimum events before anomaly detection runs
+  anomaly_alert_threshold: 0.75   # 0..1; higher = fewer, stronger anomalies
+
+  # Optional local LLM for `sentinel explain` (Ollama-compatible).
+  # When disabled/unreachable, a deterministic template explanation is used.
+  llm:
+    enabled: false
+    endpoint: "http://localhost:11434"
+    model: "llama3.1"
+    timeout_seconds: 60.0
+    max_tokens: 700
+
+# -----------------------------------------------------------------------------
+# Firewall integration — SentinelAI contains NO firewall logic of its own.
+# It talks to YOUR Firewall Automation project through one of these adapters.
+# -----------------------------------------------------------------------------
+firewall:
+  # dry_run | python | command
+  adapter: "dry_run"
+  timeout_seconds: 15.0
+
+  # adapter: python — import a controller from your project.
+  #   The object must expose block_ip / unblock_ip / temporary_block /
+  #   list_blocked (and optionally is_blocked).
+  module: ""                 # e.g. "firewall_automation.api"
+  attribute: ""              # e.g. "FirewallManager" (class or factory; optional)
+  init_kwargs: {}            # e.g. {profile: "sentinel"}
+
+  # adapter: command — call your project's CLI (no shell; args are a list).
+  command: ""                # e.g. "firewall-automation"
+  block_args: ["block", "{ip}"]
+  unblock_args: ["unblock", "{ip}"]
+  temp_block_args: ["block", "{ip}", "--duration", "{duration}"]
+  list_args: ["list"]
+
+# -----------------------------------------------------------------------------
+# Automatic response policy (OFF by default — review before enabling!)
+# -----------------------------------------------------------------------------
+response:
+  enabled: false
+  min_risk_level: "high"          # informational|low|medium|high|critical
+  temporary_block: true
+  block_duration_seconds: 3600
+  cooldown_seconds: 600           # per-IP, prevents block/unblock thrash
+  max_blocks_per_run: 25
+  # Never block these networks (loopback + RFC1918 by default).
+  allowlist:
+    - "127.0.0.0/8"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+
+# -----------------------------------------------------------------------------
+# Reporting
+# -----------------------------------------------------------------------------
+report:
+  output_dir: "reports"
+  formats: ["json", "html"]       # any of: json, csv, html
+  include_events: true
+  max_events_per_alert: 5
+  title: "SentinelAI Security Report"
+
+# -----------------------------------------------------------------------------
+# Live monitoring (`sentinel live`)
+# -----------------------------------------------------------------------------
+live:
+  paths:
+    - "/var/log/auth.log"
+    - "/var/log/syslog"
+  poll_interval_seconds: 1.0
+  from_beginning: false           # true = also process existing content
+  dedup_window_seconds: 300
