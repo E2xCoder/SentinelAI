@@ -23,6 +23,7 @@ firewall automation through a clean adapter boundary.
 - [Configuration](#configuration)
 - [CLI usage](#cli-usage)
 - [Detection rules](#detection-rules)
+- [Evaluation benchmark](#evaluation-benchmark)
 - [Threat detection example](#threat-detection-example)
 - [AI explanation example](#ai-explanation-example)
 - [Firewall integration](#firewall-integration)
@@ -160,6 +161,9 @@ sentinel replay examples/auth.log --speed 10
 
 # Explain a stored alert (AI-assisted if a local LLM is configured):
 sentinel explain 8
+
+# Run the detection benchmark and gate it against the committed baseline:
+sentinel eval --baseline benchmarks/baseline.json
 ```
 
 ---
@@ -205,6 +209,7 @@ sentinel config
 | `sentinel explain <id>`    | Explain a stored alert (why, attack, actions, confidence)|
 | `sentinel report <file>`   | Summarize a previously generated JSON report             |
 | `sentinel rules`           | List all detection rules with MITRE mappings             |
+| `sentinel eval`            | Run the frozen detection benchmark (precision/recall)    |
 | `sentinel config`          | Show effective configuration and component status        |
 | `sentinel version`         | Show the version                                         |
 
@@ -276,6 +281,144 @@ detection:
     - "deploy"
     - "ci-runner"
 ```
+
+---
+
+## Evaluation benchmark
+
+`sentinel eval` measures detection quality reproducibly: it runs a fixed set of
+labeled log scenarios through the detection pipeline and reports precision and
+recall. In CI it acts as a regression gate against a committed baseline. The
+command is offline: no plugins, no threat-intel calls, no automatic response,
+and each scenario uses an isolated temporary state directory.
+
+### Layout
+
+```
+benchmarks/
+├── MANIFEST.sha256          # SHA-256 of every file under scenarios/
+├── baseline.json            # committed reference report (no performance data)
+└── scenarios/
+    └── <name>/
+        ├── labels.yaml      # what must (and must not) fire
+        └── *.log            # one or more log files
+```
+
+### labels.yaml format
+
+An attack scenario:
+
+```yaml
+name: ssh-brute-force            # must equal the directory name
+kind: attack
+description: Repeated SSH password failures from one source.
+files:
+  - auth.log
+expect:
+  rules: [R001]                  # all of these must fire
+  min_risk_level: high           # optional; an expected alert must reach it
+forbid:
+  rules: [R005]                  # optional; none of these may fire
+```
+
+A benign scenario:
+
+```yaml
+name: normal-admin-session
+kind: benign
+description: Routine logins and a few sudo commands.
+files:
+  - auth.log
+```
+
+Rules, enforced when scenarios are loaded (invalid labels abort the run):
+
+- Only the keys `name`, `kind`, `description`, `files`, `expect`, `forbid` are
+  allowed at the top level; `expect` accepts `rules` and `min_risk_level`,
+  `forbid` accepts `rules`. Unknown keys are rejected.
+- `kind` is `attack` or `benign`. `files` must be a non-empty list.
+- **Benign:** any alert at all is a false positive. It must not set
+  `expect.rules` or `expect.min_risk_level`.
+- **Attack:** `expect.rules` is required and non-empty. `min_risk_level`
+  (`informational`, `low`, `medium`, `high`, `critical`) is satisfied when at
+  least one alert from `expect.rules` reaches that level. `forbid.rules` lists
+  rules that must not fire.
+- Rule IDs must exist in the rule registry (or be `AI001`).
+- File paths must be relative and stay inside the scenario directory; absolute
+  paths, `..` and paths resolving outside the directory are rejected.
+
+### Metrics
+
+- Per-rule precision and recall, computed at scenario level.
+- False positives per 1k benign events.
+- Risk distribution of the alerts raised.
+- MITRE ATT&CK coverage (techniques covered by passing expectations vs. all
+  techniques mapped by registered rules) and rules not covered by any scenario.
+- Throughput in events/sec (reported, never used for gating).
+
+A scenario passes when no expected rule is missing, no forbidden rule fired
+(for benign scenarios: no rule fired), and `min_risk_level` was reached.
+
+### Running
+
+```bash
+sentinel eval                                        # run, print tables
+sentinel eval --baseline benchmarks/baseline.json    # fail on regression vs baseline
+sentinel eval --write-baseline benchmarks/baseline.json
+sentinel eval --output eval-report.json              # full JSON report incl. performance
+sentinel eval --json                                 # JSON report on stdout
+```
+
+| Option                  | Description                                                     |
+|-------------------------|-----------------------------------------------------------------|
+| `--benchmarks <dir>`    | Benchmark root containing `scenarios/` (default `benchmarks`)   |
+| `--baseline <file>`     | Compare against this baseline and fail on regressions           |
+| `--write-baseline <f>`  | Write the deterministic report (no performance data)            |
+| `--output <file>`       | Write the full JSON report (with performance)                   |
+| `--update-manifest`     | Rewrite `MANIFEST.sha256` instead of verifying it               |
+| `--max-recall-drop <x>` | Tolerated recall drop, 0..1 (default `0.0`)                     |
+| `--max-fp-increase <x>` | Tolerated rise of FP per 1k benign events (default `0.0`)       |
+| `--json`                | Print the JSON report to stdout                                 |
+
+The exit code is 1 if any scenario fails or any regression against the baseline
+is found (lower overall or per-rule recall beyond the threshold, higher
+false-positive rate, a previously passing scenario that now fails or is
+missing, or a changed report `schema_version`).
+
+### Frozen benchmark
+
+Scenario files are hashed in `MANIFEST.sha256` (CRLF is normalized to LF before
+hashing; symlinks are rejected). Every run first verifies the manifest and
+aborts on any modified, added or removed file. Changing a scenario is therefore
+a deliberate act: edit the files, run `sentinel eval --update-manifest`, then
+regenerate the baseline with `--write-baseline` and commit both. Learning or
+tuning code must never write into `benchmarks/`.
+
+### Authoring scenarios
+
+- Use RFC 3339 timestamps with an explicit year and offset
+  (`2026-01-07T10:15:32+00:00`). Do not use BSD-style `Jan  7 10:15:32`
+  headers: they carry no year, so the year is inferred from today's date and
+  results would change over time.
+- Use RFC 5737 documentation IPs (`192.0.2.0/24`, `198.51.100.0/24`,
+  `203.0.113.0/24`) and no real hostnames, users or secrets.
+- Use LF line endings (the repository's `.gitattributes` is there to keep them).
+
+### Limitations
+
+The scenarios are synthetic and were written against the current behavior of
+the rules. 100% recall and 0 false positives on this benchmark therefore means
+"no regression", not real-world accuracy.
+
+### Known detection gaps surfaced while building the benchmark
+
+- R051 also flags plain `ufw allow` commands.
+- R060 fires on any Docker log line containing the word "privileged", even
+  `privileged: false`.
+- R041/R042 cannot tell a legitimate `authorized_keys` edit from an attack
+  because they match on the text.
+- R031 and R050 score only "medium" risk.
+- `pam_faillock` lines logged by sshd are not classified as `ACCOUNT_LOCKED`.
 
 ---
 
@@ -368,13 +511,19 @@ skips allowlisted networks, enforces a per-IP cooldown and a per-run block budge
 ```bash
 pip install -e ".[ai,dev]"
 
-pytest tests/ -v            # run the test suite (126 tests)
+pytest tests/ -v            # run the test suite
 pytest tests/ --cov=sentinelai   # with coverage
 
 ruff check src tests        # lint
 ruff format src tests       # format
 mypy src                    # type-check (strict)
+
+sentinel eval --baseline benchmarks/baseline.json   # detection regression gate
 ```
+
+CI (`.github/workflows/ci.yml`) runs ruff, mypy, pytest and `sentinel eval
+--baseline benchmarks/baseline.json` on Python 3.10, 3.11, 3.12 and 3.13 for
+every push to `main` and every pull request.
 
 Layout: source in `src/sentinelai/`, tests in `tests/`, sample logs in
 `examples/`. The pipeline (`core/pipeline.py`) is the composition root — start
