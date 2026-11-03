@@ -207,6 +207,44 @@ response:
     - "172.16.0.0/12"
     - "192.168.0.0/16"
 
+  # --- Safe automated response (see README "Safe automated response") ---
+  # Everything below is optional; the values shown are the defaults except
+  # where an example is given.
+  #
+  # mode: "auto"                    # auto = block now | approval = queue for
+  #                                 # `sentinel respond --approve ID`
+  # admin_ranges: []                # never blocked, e.g. ["203.0.113.0/24"]
+  # protect_ssh_peer: true          # client of the current SSH session
+  #                                 # (SSH_CONNECTION / SSH_CLIENT)
+  # protect_gateway: true           # default IPv4 gateway (Linux only)
+  # protect_own_addresses: true     # loopback and this host's addresses
+  # max_blocks_per_hour: 30         # hourly circuit breaker; positive integer
+  #                                 # (also caps the approval queue at
+  #                                 # max(100, 10 x this value) open requests)
+  # pending_expire_seconds: 86400   # unapproved requests expire after this
+  # reap_interval_seconds: 60       # `sentinel live` removes expired blocks
+  #                                 # this often (also: `sentinel respond --reap`)
+  #
+  # Safety behaviour (not configurable):
+  #   - IPv4-mapped IPv6 (::ffff:a.b.c.d) is treated as the IPv4 address, so
+  #     allowlist / admin_ranges also match it. Unspecified, loopback,
+  #     multicast, link-local and reserved addresses are never blocked.
+  #   - max_blocks_per_run resets every hour (matters for `sentinel live`).
+  #     Five consecutive firewall failures pause automatic blocking until the
+  #     next hourly window.
+  #   - A block is recorded in the database before the firewall is called and
+  #     is refused if it cannot be recorded. The hourly breaker and the
+  #     lockout guard refuse to block when they cannot read their data.
+  #
+  # Reference UFW adapter (copy examples/firewall_adapter_ufw.py into your own
+  # firewall project first), set in the `firewall:` section above. It uses
+  # `ufw insert 1 deny from <ip>`, refuses to block while UFW is inactive, and
+  # `ufw insert 1` fails on a completely empty rule set:
+  #   adapter: "python"
+  #   module: "firewall_adapter_ufw"
+  #   attribute: "UfwFirewall"
+  #   init_kwargs: {sudo_prefix: ["sudo", "-n"], ufw_binary: "ufw", timeout_seconds: 15}
+
 # -----------------------------------------------------------------------------
 # Reporting
 # -----------------------------------------------------------------------------

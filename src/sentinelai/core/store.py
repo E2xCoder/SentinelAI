@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_rule ON alerts (rule_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_risk ON alerts (risk_level);
 """
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _MIGRATION_2: tuple[str, ...] = (
     "CREATE TABLE IF NOT EXISTS feedback ("
@@ -80,12 +80,61 @@ _MIGRATION_2: tuple[str, ...] = (
     "rolled_back INTEGER NOT NULL DEFAULT 0)",
 )
 
+_MIGRATION_3: tuple[str, ...] = (
+    "CREATE TABLE IF NOT EXISTS response_actions ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "ts TEXT NOT NULL, "
+    "action TEXT NOT NULL CHECK(action IN ('block_ip','temporary_block')), "
+    "ip TEXT NOT NULL, "
+    "duration_seconds INTEGER, "
+    "expires_at TEXT, "
+    "status TEXT NOT NULL CHECK(status IN ('applied','reaped','rolled_back','failed')), "
+    "alert_id INTEGER, "
+    "rule_id TEXT NOT NULL DEFAULT '', "
+    "run_id TEXT NOT NULL DEFAULT '', "
+    "detail TEXT NOT NULL DEFAULT '')",
+    "CREATE INDEX IF NOT EXISTS idx_response_actions_status_exp "
+    "ON response_actions (status, expires_at)",
+    "CREATE INDEX IF NOT EXISTS idx_response_actions_ip ON response_actions (ip)",
+    "CREATE INDEX IF NOT EXISTS idx_response_actions_run ON response_actions (run_id)",
+    "CREATE INDEX IF NOT EXISTS idx_response_actions_ts ON response_actions (ts)",
+    "CREATE TABLE IF NOT EXISTS response_pending ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "ts TEXT NOT NULL, "
+    "ip TEXT NOT NULL, "
+    "alert_id INTEGER, "
+    "rule_id TEXT NOT NULL DEFAULT '', "
+    "risk_level TEXT NOT NULL, "
+    "risk_score REAL NOT NULL, "
+    "action TEXT NOT NULL CHECK(action IN ('block_ip','temporary_block')), "
+    "duration_seconds INTEGER, "
+    "status TEXT NOT NULL CHECK(status IN ('pending','approved','denied','expired')), "
+    "decided_at TEXT, "
+    "note TEXT NOT NULL DEFAULT '')",
+    "CREATE INDEX IF NOT EXISTS idx_response_pending_status ON response_pending (status)",
+    "CREATE INDEX IF NOT EXISTS idx_response_pending_ip ON response_pending (ip)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_response_pending_ip "
+    "ON response_pending (ip) WHERE status = 'pending'",
+)
+
 # Statements executed (inside one transaction) to reach each schema version.
-_MIGRATIONS: dict[int, tuple[str, ...]] = {2: _MIGRATION_2}
+_MIGRATIONS: dict[int, tuple[str, ...]] = {2: _MIGRATION_2, 3: _MIGRATION_3}
 
 _FEEDBACK_LABELS = frozenset({"tp", "fp"})
 _CONFIG_ACTIONS = frozenset({"apply", "rollback"})
+_RESPONSE_ACTIONS = frozenset({"block_ip", "temporary_block"})
+_RESPONSE_STATUSES = frozenset({"applied", "reaped", "rolled_back", "failed"})
+_PENDING_STATUSES = frozenset({"pending", "approved", "denied", "expired"})
+_PENDING_DECISIONS = frozenset({"approved", "denied", "expired"})
 _MAX_NOTE_LEN = 500
+
+_ACTION_COLUMNS = (
+    "id, ts, action, ip, duration_seconds, expires_at, status, alert_id, rule_id, run_id, detail"
+)
+_PENDING_COLUMNS = (
+    "id, ts, ip, alert_id, rule_id, risk_level, risk_score, action, duration_seconds, "
+    "status, decided_at, note"
+)
 
 
 @dataclass(slots=True)
@@ -113,6 +162,41 @@ class ConfigHistoryEntry:
     new_text: str
     note: str
     rolled_back: bool
+
+
+@dataclass(slots=True)
+class ResponseActionRow:
+    """One firewall response action (block / temporary block) and its lifecycle state."""
+
+    id: int
+    ts: datetime
+    action: str
+    ip: str
+    duration_seconds: int | None
+    expires_at: datetime | None
+    status: str
+    alert_id: int | None
+    rule_id: str
+    run_id: str
+    detail: str
+
+
+@dataclass(slots=True)
+class PendingResponse:
+    """A response awaiting human approval."""
+
+    id: int
+    ts: datetime
+    ip: str
+    alert_id: int | None
+    rule_id: str
+    risk_level: str
+    risk_score: float
+    action: str
+    duration_seconds: int | None
+    status: str
+    decided_at: datetime | None
+    note: str
 
 
 class AlertStore:
@@ -396,9 +480,379 @@ class AlertStore:
         if cursor.rowcount == 0:
             raise StorageError(f"Config history entry #{history_id} does not exist")
 
+    # -- response actions -------------------------------------------------
+
+    def add_response_action(
+        self,
+        *,
+        action: str,
+        ip: str,
+        duration_seconds: int | None,
+        expires_at: datetime | None,
+        status: str,
+        alert_id: int | None,
+        rule_id: str,
+        run_id: str,
+        detail: str = "",
+        ts: datetime | None = None,
+    ) -> int:
+        """Record a response action and return its id."""
+        if action not in _RESPONSE_ACTIONS:
+            raise StorageError(f"Invalid response action {action!r}")
+        if status not in _RESPONSE_STATUSES:
+            raise StorageError(f"Invalid response action status {status!r}")
+        stamp = _utc_iso(ts)
+        expires = _utc_iso(expires_at) if expires_at is not None else None
+        try:
+            cursor = self._conn.execute(
+                "INSERT INTO response_actions (ts, action, ip, duration_seconds, expires_at, "
+                "status, alert_id, rule_id, run_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    stamp,
+                    action,
+                    ip,
+                    duration_seconds,
+                    expires,
+                    status,
+                    alert_id,
+                    rule_id,
+                    run_id,
+                    detail[:_MAX_NOTE_LEN],
+                ),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to record response action: {exc}") from exc
+        return int(cursor.lastrowid or 0)
+
+    def list_response_actions(
+        self,
+        *,
+        status: str | None = None,
+        since: datetime | None = None,
+        run_id: str | None = None,
+        ip: str | None = None,
+        limit: int | None = None,
+    ) -> list[ResponseActionRow]:
+        """Response actions ordered by id ascending, with optional filters."""
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+        if since is not None:
+            clauses.append("ts >= ?")
+            params.append(_utc_iso(since))
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        if ip is not None:
+            clauses.append("ip = ?")
+            params.append(ip)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_sql = ""
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            params.append(int(limit))
+        return self._query_actions(
+            f"SELECT {_ACTION_COLUMNS} FROM response_actions{where} ORDER BY id{limit_sql}",
+            params,
+        )
+
+    def count_response_actions_since(self, since: datetime) -> int:
+        """Number of successful blocks (applied/reaped/rolled_back) at or after *since*."""
+        try:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM response_actions "
+                "WHERE status IN ('applied', 'reaped', 'rolled_back') AND ts >= ?",
+                (_utc_iso(since),),
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to count response actions: {exc}") from exc
+        return int(row[0])
+
+    def set_response_action_status(self, action_id: int, status: str, detail: str = "") -> None:
+        """Change an action's status; a non-empty *detail* replaces the stored detail."""
+        if status not in _RESPONSE_STATUSES:
+            raise StorageError(f"Invalid response action status {status!r}")
+        try:
+            if detail:
+                cursor = self._conn.execute(
+                    "UPDATE response_actions SET status = ?, detail = ? WHERE id = ?",
+                    (status, detail[:_MAX_NOTE_LEN], action_id),
+                )
+            else:
+                cursor = self._conn.execute(
+                    "UPDATE response_actions SET status = ? WHERE id = ?",
+                    (status, action_id),
+                )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to update response action #{action_id}: {exc}") from exc
+        if cursor.rowcount == 0:
+            raise StorageError(f"Response action #{action_id} does not exist")
+
+    def due_response_actions(self, now: datetime) -> list[ResponseActionRow]:
+        """Applied actions whose expiry has passed (ready to be reaped)."""
+        return self._query_actions(
+            f"SELECT {_ACTION_COLUMNS} FROM response_actions "
+            "WHERE status = 'applied' AND expires_at IS NOT NULL AND expires_at <= ? "
+            "ORDER BY id",
+            [_utc_iso(now)],
+        )
+
+    def covering_response_actions(
+        self, ip: str, *, exclude_id: int, expires_after: datetime | None
+    ) -> list[ResponseActionRow]:
+        """Applied actions for *ip* (other than *exclude_id*) that outlive *expires_after*.
+
+        Permanent rows always qualify; timed rows qualify only when
+        *expires_after* is given and their expiry is strictly later.
+        """
+        sql = (
+            f"SELECT {_ACTION_COLUMNS} FROM response_actions "
+            "WHERE status = 'applied' AND ip = ? AND id != ? AND (expires_at IS NULL"
+        )
+        params: list[Any] = [ip, int(exclude_id)]
+        if expires_after is not None:
+            sql += " OR expires_at > ?"
+            params.append(_utc_iso(expires_after))
+        sql += ") ORDER BY id"
+        return self._query_actions(sql, params)
+
+    def _query_actions(self, sql: str, params: Sequence[Any]) -> list[ResponseActionRow]:
+        try:
+            rows = self._conn.execute(sql, params).fetchall()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to list response actions: {exc}") from exc
+        result: list[ResponseActionRow] = []
+        for r in rows:
+            try:
+                result.append(_action_from_row(r))
+            except (StorageError, ValueError, TypeError) as exc:
+                _LOGGER.warning("Skipping corrupt response action row %r: %s", r[0], exc)
+        return result
+
+    # -- pending approvals ------------------------------------------------
+
+    def add_pending(
+        self,
+        *,
+        ip: str,
+        alert_id: int | None,
+        rule_id: str,
+        risk_level: str,
+        risk_score: float,
+        action: str,
+        duration_seconds: int | None,
+        ts: datetime | None = None,
+    ) -> int:
+        """Queue a response for human approval and return the pending id."""
+        if action not in _RESPONSE_ACTIONS:
+            raise StorageError(f"Invalid response action {action!r}")
+        stamp = _utc_iso(ts)
+        try:
+            cursor = self._conn.execute(
+                "INSERT INTO response_pending (ts, ip, alert_id, rule_id, risk_level, "
+                "risk_score, action, duration_seconds, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+                (
+                    stamp,
+                    ip,
+                    alert_id,
+                    rule_id,
+                    risk_level,
+                    float(risk_score),
+                    action,
+                    duration_seconds,
+                ),
+            )
+            self._conn.commit()
+        except sqlite3.IntegrityError as exc:
+            self._conn.rollback()
+            if "UNIQUE" in str(exc).upper():
+                raise StorageError("a request for this IP is already pending") from exc
+            raise StorageError(f"Failed to queue pending response: {exc}") from exc
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to queue pending response: {exc}") from exc
+        return int(cursor.lastrowid or 0)
+
+    def list_pending(self, status: str | None = "pending") -> list[PendingResponse]:
+        """Pending-response rows ordered by id; ``status=None`` returns every row."""
+        sql = f"SELECT {_PENDING_COLUMNS} FROM response_pending"
+        params: list[Any] = []
+        if status is not None:
+            sql += " WHERE status = ?"
+            params.append(status)
+        sql += " ORDER BY id"
+        try:
+            rows = self._conn.execute(sql, params).fetchall()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to list pending responses: {exc}") from exc
+        return [p for p in (_safe_pending_from_row(r) for r in rows) if p is not None]
+
+    def get_pending(self, pending_id: int) -> PendingResponse | None:
+        """Load one pending response by id (``None`` if missing or corrupt)."""
+        try:
+            row = self._conn.execute(
+                f"SELECT {_PENDING_COLUMNS} FROM response_pending WHERE id = ?",
+                (pending_id,),
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to read pending response #{pending_id}: {exc}") from exc
+        return _safe_pending_from_row(row) if row is not None else None
+
+    def pending_count(self) -> int:
+        """Number of rows still awaiting a decision."""
+        try:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM response_pending WHERE status = 'pending'"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to count pending responses: {exc}") from exc
+        return int(row[0])
+
+    def claim_pending(self, pending_id: int, note: str = "") -> bool:
+        """Atomically move ``pending`` -> ``approved``; ``True`` only for the single winner."""
+        try:
+            cursor = self._conn.execute(
+                "UPDATE response_pending SET status = 'approved', decided_at = ?, note = ? "
+                "WHERE id = ? AND status = 'pending'",
+                (_utc_iso(None), note[:_MAX_NOTE_LEN], pending_id),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to claim pending response #{pending_id}: {exc}") from exc
+        return cursor.rowcount == 1
+
+    def release_pending(self, pending_id: int) -> None:
+        """Undo a claim (``approved`` -> ``pending``); no-op if it no longer applies.
+
+        If another open request for the same IP exists meanwhile, the row is
+        marked ``denied`` ("superseded") instead.
+        """
+        try:
+            try:
+                self._conn.execute(
+                    "UPDATE response_pending SET status = 'pending', decided_at = NULL "
+                    "WHERE id = ? AND status = 'approved'",
+                    (pending_id,),
+                )
+            except sqlite3.IntegrityError:
+                self._conn.rollback()
+                self._conn.execute(
+                    "UPDATE response_pending SET status = 'denied', note = ?, decided_at = ? "
+                    "WHERE id = ? AND status = 'approved'",
+                    ("superseded", _utc_iso(None), pending_id),
+                )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to release pending response #{pending_id}: {exc}") from exc
+
+    def has_open_pending(self, ip: str) -> int | None:
+        """Id of a still-pending row for *ip*, else ``None``."""
+        try:
+            row = self._conn.execute(
+                "SELECT id FROM response_pending WHERE ip = ? AND status = 'pending' "
+                "ORDER BY id DESC LIMIT 1",
+                (ip,),
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to look up pending response for {ip}: {exc}") from exc
+        return int(row[0]) if row is not None else None
+
+    def decide_pending(
+        self,
+        pending_id: int,
+        status: str,
+        note: str = "",
+        decided_at: datetime | None = None,
+    ) -> None:
+        """Move a row to approved/denied/expired; valid from ``pending`` (or approved->denied)."""
+        if status not in _PENDING_DECISIONS:
+            raise StorageError(
+                f"Invalid pending decision {status!r}; expected 'approved', 'denied' or 'expired'"
+            )
+        stamp = _utc_iso(decided_at)
+        allowed_from = ("pending", "approved") if status == "denied" else ("pending",)
+        placeholders = ", ".join("?" for _ in allowed_from)
+        try:
+            cursor = self._conn.execute(
+                "UPDATE response_pending SET status = ?, note = ?, decided_at = ? "
+                f"WHERE id = ? AND status IN ({placeholders})",
+                (status, note[:_MAX_NOTE_LEN], stamp, pending_id, *allowed_from),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to decide pending response #{pending_id}: {exc}") from exc
+        if cursor.rowcount == 0:
+            raise StorageError(f"Pending response #{pending_id} does not exist or is not pending")
+
+    def expire_pending(self, older_than: datetime) -> int:
+        """Mark pending rows created before *older_than* as expired; return the count."""
+        try:
+            cursor = self._conn.execute(
+                "UPDATE response_pending SET status = 'expired', decided_at = ? "
+                "WHERE status = 'pending' AND ts < ?",
+                (_utc_iso(None), _utc_iso(older_than)),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to expire pending responses: {exc}") from exc
+        return int(cursor.rowcount)
+
     def close(self) -> None:
         """Close the database handle."""
         self._conn.close()
+
+
+def _action_from_row(r: Sequence[Any]) -> ResponseActionRow:
+    return ResponseActionRow(
+        id=int(r[0]),
+        ts=_parse_stored_ts(r[1]),
+        action=str(r[2]),
+        ip=str(r[3]),
+        duration_seconds=int(r[4]) if r[4] is not None else None,
+        expires_at=_parse_stored_ts(r[5]) if r[5] is not None else None,
+        status=str(r[6]),
+        alert_id=int(r[7]) if r[7] is not None else None,
+        rule_id=str(r[8]),
+        run_id=str(r[9]),
+        detail=str(r[10]),
+    )
+
+
+def _safe_pending_from_row(r: Sequence[Any]) -> PendingResponse | None:
+    """Convert a row, logging and returning ``None`` if it is corrupt."""
+    try:
+        return _pending_from_row(r)
+    except (StorageError, ValueError, TypeError) as exc:
+        _LOGGER.warning("Skipping corrupt pending response row %r: %s", r[0], exc)
+        return None
+
+
+def _pending_from_row(r: Sequence[Any]) -> PendingResponse:
+    return PendingResponse(
+        id=int(r[0]),
+        ts=_parse_stored_ts(r[1]),
+        ip=str(r[2]),
+        alert_id=int(r[3]) if r[3] is not None else None,
+        rule_id=str(r[4]),
+        risk_level=str(r[5]),
+        risk_score=float(r[6]),
+        action=str(r[7]),
+        duration_seconds=int(r[8]) if r[8] is not None else None,
+        status=str(r[9]),
+        decided_at=_parse_stored_ts(r[10]) if r[10] is not None else None,
+        note=str(r[11]),
+    )
 
 
 def _utc_iso(ts: datetime | None) -> str:

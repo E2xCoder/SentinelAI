@@ -84,11 +84,10 @@ def store(tmp_path: Path):
 
 
 class TestStoreMigration:
-    def test_fresh_database_is_schema_version_2(self, tmp_path: Path) -> None:
+    def test_fresh_database_is_current_schema_version(self, tmp_path: Path) -> None:
         db = AlertStore(tmp_path / "fresh.db")
         try:
-            assert SCHEMA_VERSION == 2
-            assert db.schema_version == 2
+            assert db.schema_version == SCHEMA_VERSION
         finally:
             db.close()
         assert {"alerts", "feedback", "config_history"} <= _table_names(tmp_path / "fresh.db")
@@ -125,7 +124,7 @@ class TestStoreMigration:
 
         db = AlertStore(path)
         try:
-            assert db.schema_version == 2
+            assert db.schema_version == SCHEMA_VERSION
             loaded = db.get(1)
             assert loaded is not None
             assert loaded.rule_id == "R001"
@@ -145,7 +144,7 @@ class TestStoreMigration:
         first.close()
         second = AlertStore(path)
         try:
-            assert second.schema_version == 2
+            assert second.schema_version == SCHEMA_VERSION
             assert len(second.recent()) == 1
         finally:
             second.close()

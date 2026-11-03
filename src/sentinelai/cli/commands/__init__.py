@@ -4,7 +4,8 @@
 replay, live); ``inspection`` holds the read-only commands (explain,
 report, search, rules, config, version); ``evaluation`` holds the offline
 benchmark command (eval); ``tuning`` holds the feedback-driven tuning loop
-(feedback, review, tune). ``app.py`` registers them on
+(feedback, review, tune); ``respond`` holds the human-approved firewall
+response command. ``app.py`` registers them on
 the root group, so adding a command is a local change here.
 """
 
@@ -18,6 +19,7 @@ from sentinelai.cli.commands.inspection import (
     search,
     version_cmd,
 )
+from sentinelai.cli.commands.respond import respond_cmd
 from sentinelai.cli.commands.tuning import feedback_cmd, review_cmd, tune_cmd
 
 #: Every command registered on the root CLI group, in help order.
@@ -36,6 +38,7 @@ ALL_COMMANDS = [
     feedback_cmd,
     review_cmd,
     tune_cmd,
+    respond_cmd,
 ]
 
 __all__ = ["ALL_COMMANDS"]

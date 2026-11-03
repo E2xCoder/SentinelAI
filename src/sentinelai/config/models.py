@@ -400,6 +400,39 @@ class ResponseConfig:
         default_factory=lambda: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
     )
     max_blocks_per_run: int = 25
+    mode: str = "auto"
+    admin_ranges: list[str] = field(default_factory=list)
+    protect_ssh_peer: bool = True
+    protect_gateway: bool = True
+    protect_own_addresses: bool = True
+    max_blocks_per_hour: int = 30
+    pending_expire_seconds: int = 86400
+    reap_interval_seconds: int = 60
+
+    def _validate_safety(self) -> None:
+        """Validate the safe-response fields (mode, protected ranges, limits)."""
+        if self.mode not in ("auto", "approval"):
+            raise ConfigError("response.mode must be one of: auto, approval")
+        for name in ("allowlist", "admin_ranges"):
+            entries = getattr(self, name)
+            if not isinstance(entries, (list, tuple)):
+                raise ConfigError(f"response.{name} must be a list of IPs or CIDRs")
+            for entry in entries:
+                try:
+                    if not isinstance(entry, str):
+                        raise ValueError(entry)
+                    ipaddress.ip_network(entry.strip(), strict=False)
+                except ValueError:
+                    raise ConfigError(
+                        f"response.{name} contains an invalid IP address or CIDR: {entry!r}"
+                    ) from None
+        for name in ("protect_ssh_peer", "protect_gateway", "protect_own_addresses"):
+            if not isinstance(getattr(self, name), bool):
+                raise ConfigError(f"response.{name} must be a boolean")
+        for name in ("max_blocks_per_hour", "pending_expire_seconds", "reap_interval_seconds"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ConfigError(f"response.{name} must be a positive integer")
 
     def validate(self) -> None:
         from sentinelai.core.models import RiskLevel
@@ -417,6 +450,7 @@ class ResponseConfig:
             raise ConfigError("response.cooldown_seconds must not be negative")
         if self.max_blocks_per_run <= 0:
             raise ConfigError("response.max_blocks_per_run must be positive")
+        self._validate_safety()
 
 
 @dataclass(slots=True)

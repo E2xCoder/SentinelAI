@@ -11,15 +11,67 @@ _IP_CANDIDATE = re.compile(
 )
 
 
+_MAX_IP_TEXT = 64
+
+
+def _canonical_address(
+    value: object,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Parse a plain textual IP into a canonical address object (or None)."""
+    if not isinstance(value, str) or not value or len(value) > _MAX_IP_TEXT:
+        return None
+    if value != value.strip() or any(ch.isspace() for ch in value):
+        return None
+    if "%" in value or "/" in value:
+        return None
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        return addr.ipv4_mapped
+    return addr
+
+
+def canonical_ip(value: str) -> str | None:
+    """Return the canonical text of a plain IPv4/IPv6 address, else None.
+
+    Rejects whitespace, ``%zone`` ids and ``/prefix`` suffixes. IPv4-mapped
+    IPv6 (``::ffff:a.b.c.d``) is mapped to the IPv4 string; output is
+    lower-case and compressed.
+    """
+    addr = _canonical_address(value)
+    return str(addr) if addr is not None else None
+
+
+def blockable_reason(ip: str) -> str | None:
+    """Return why *ip* must never be blocked by core code, or None when it may be."""
+    addr = _canonical_address(ip)
+    if addr is None:
+        return "not a valid IP address"
+    text = str(addr)
+    if addr.is_unspecified:
+        kind = "an unspecified address"
+    elif addr.is_loopback:
+        kind = "a loopback address"
+    elif addr.is_multicast:
+        kind = "a multicast address"
+    elif addr.is_link_local:
+        kind = "a link-local address"
+    elif text == "255.255.255.255":
+        kind = "the broadcast address"
+    elif addr.is_reserved:
+        kind = "a reserved address"
+    else:
+        return None
+    return f"{text} is {kind}; it is never blocked"
+
+
 def is_valid_ip(value: str | None) -> bool:
-    """Return True when *value* is a syntactically valid IPv4/IPv6 address."""
+    """Return True when *value* is a plain IPv4/IPv6 address (no zone or prefix)."""
     if not value:
         return False
-    try:
-        ipaddress.ip_address(value)
-    except ValueError:
-        return False
-    return True
+    return canonical_ip(value) is not None
 
 
 def is_public_ip(value: str) -> bool:
@@ -46,9 +98,8 @@ def ip_in_networks(value: str, networks: list[str]) -> bool:
     Invalid CIDR entries are skipped rather than raising, so a typo in an
     allowlist never disables response handling entirely.
     """
-    try:
-        addr = ipaddress.ip_address(value)
-    except ValueError:
+    addr = _canonical_address(value)
+    if addr is None:
         return False
     for net in networks:
         try:

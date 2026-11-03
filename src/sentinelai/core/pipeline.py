@@ -6,6 +6,7 @@ injected, so tests and plugins can substitute any stage.
 
 from __future__ import annotations
 
+import uuid
 from collections import Counter, deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -14,12 +15,15 @@ from datetime import datetime
 from sentinelai.ai.behavior import BehaviorAnalyzer
 from sentinelai.ai.engine import AIEngine
 from sentinelai.ai.patterns import AttackPattern
-from sentinelai.config.models import SentinelConfig
+from sentinelai.config.models import ResponseConfig, SentinelConfig
 from sentinelai.core.exceptions import AIError
 from sentinelai.core.models import Alert, LogEvent
 from sentinelai.core.store import AlertStore
 from sentinelai.detection.engine import RuleEngine
 from sentinelai.firewall.adapters import create_firewall
+from sentinelai.firewall.audit import ResponseAudit
+from sentinelai.firewall.lockout import LockoutGuard
+from sentinelai.firewall.operator import ResponseOperator
 from sentinelai.firewall.responder import AutoResponder
 from sentinelai.intel.aggregator import ThreatIntelAggregator
 from sentinelai.risk.engine import RiskEngine
@@ -85,7 +89,29 @@ class AnalysisPipeline:
         self.intel = ThreatIntelAggregator(config.intel, state_dir)
         self.ai = AIEngine(config.ai)
         self.firewall = create_firewall(config.firewall)
-        self.responder = AutoResponder(config.response, self.firewall)
+        self.run_id = uuid.uuid4().hex[:8]
+        self.response_audit = ResponseAudit(state_dir / "response" / "audit.jsonl")
+        self.guard = LockoutGuard(config.response)
+        self.responder = AutoResponder(
+            config.response,
+            self.firewall,
+            store=self.store,
+            audit=self.response_audit,
+            guard=self.guard,
+            run_id=self.run_id,
+        )
+        self.operator = ResponseOperator(
+            config.response,
+            self.firewall,
+            self.store,
+            self.response_audit,
+            self.guard,
+        )
+
+    @property
+    def response_config(self) -> ResponseConfig:
+        """The active active-response configuration."""
+        return self._config.response
 
     def process_event(self, event: LogEvent) -> list[Alert]:
         """Run one event through detection and full alert enrichment.
@@ -115,6 +141,11 @@ class AnalysisPipeline:
         buffer is retained for the batch anomaly pass, so arbitrarily
         large logs stay memory-safe.
         """
+        if self._config.response.enabled:
+            try:
+                self.operator.reap()
+            except Exception as exc:  # noqa: BLE001 - housekeeping must not break a scan
+                _LOGGER.warning("Response reap skipped: %s", exc)
         stats = ScanStatistics()
         alerts: list[Alert] = []
         buffer: deque[LogEvent] = deque(maxlen=_AI_BUFFER_LIMIT)

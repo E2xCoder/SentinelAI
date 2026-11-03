@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -65,6 +66,21 @@ class LiveMonitor:
         ]
         self.events_seen = 0
         self.alerts_raised = 0
+        self._last_reap = time.monotonic()
+
+    def _maybe_reap(self) -> None:
+        """Expire timed-out firewall blocks at most once per reap interval."""
+        response = self._pipeline.response_config
+        if not response.enabled:
+            return
+        now = time.monotonic()
+        if now - self._last_reap < response.reap_interval_seconds:
+            return
+        self._last_reap = now
+        try:
+            self._pipeline.operator.reap()
+        except Exception:  # noqa: BLE001 - housekeeping must not stop the loop
+            _LOGGER.exception("Response reap failed")
 
     def stop(self) -> None:
         """Request the monitoring loop to exit."""
@@ -82,6 +98,7 @@ class LiveMonitor:
         try:
             while not self._stop.is_set():
                 self._poll_once()
+                self._maybe_reap()
                 iterations += 1
                 if max_iterations is not None and iterations >= max_iterations:
                     break

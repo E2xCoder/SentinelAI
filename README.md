@@ -28,6 +28,7 @@ firewall automation through a clean adapter boundary.
 - [Threat detection example](#threat-detection-example)
 - [Structured LLM triage](#structured-llm-triage)
 - [Firewall integration](#firewall-integration)
+- [Safe automated response](#safe-automated-response)
 - [Development guide](#development-guide)
 - [Extending SentinelAI](#extending-sentinelai)
 - [Contributing](#contributing)
@@ -217,6 +218,7 @@ sentinel config
 | `sentinel feedback <id>`   | Label a stored alert as true (`--tp`) or false (`--fp`) positive |
 | `sentinel review`          | Interactively label recent, unlabelled alerts            |
 | `sentinel tune`            | Propose, gate and (`--apply`) apply feedback-driven tuning |
+| `sentinel respond`         | Review, approve, deny, reap and roll back firewall responses (see [Safe automated response](#safe-automated-response)) |
 | `sentinel config`          | Show effective configuration and component status        |
 | `sentinel version`         | Show the version                                         |
 
@@ -827,6 +829,315 @@ at runtime via one of three adapters:
 
 Automatic response (off by default) only acts above a configurable risk level,
 skips allowlisted networks, enforces a per-IP cooldown and a per-run block budget.
+See [Safe automated response](#safe-automated-response) for the full list of
+safety rails, approval mode, the audit log and rollback.
+
+---
+
+## Safe automated response
+
+Automated blocking is the part of a security tool that can do the most damage,
+so it is off by default and bounded in several independent ways.
+
+- **Off by default.** Nothing is blocked unless `response.enabled: true`.
+- **`dry_run` by default.** Even when enabled, the default `firewall.adapter` is
+  `dry_run`, which only logs the intended action. A real firewall is touched
+  only after you configure the `python` or `command` adapter.
+- **Every decision is audited**, including the reason nothing was blocked
+  (except alerts below the risk threshold, and repeated identical skips are
+  throttled; see [Audit log](#audit-log)).
+- **Fails closed.** If SentinelAI cannot record a block, read the hourly block
+  history or evaluate lockout protection, it does not block.
+
+### Address handling
+
+Every address is canonicalised once, before any check, and all later checks use
+that form:
+
+- IPv4-mapped IPv6 such as `::ffff:203.0.113.7` is treated as the IPv4 address
+  `203.0.113.7`, so an allowlist or `admin_ranges` entry cannot be bypassed by
+  writing the same host in IPv6 form.
+- Input with whitespace, a zone id (`%eth0`) or a prefix (`/24`) is rejected as
+  not a valid IP.
+- Unspecified, loopback, multicast, link-local and reserved addresses (and
+  `255.255.255.255`) are never blocked, whatever the allowlist says.
+
+### Decision order
+
+For each alert, `AutoResponder` checks the following in order. The first check
+that fails ends the evaluation and the reason is written to the audit log
+(alerts below the risk threshold are not logged, and identical skips are
+throttled; see [Audit log](#audit-log)).
+
+| # | Check | Skips when |
+|---|-------|------------|
+| 1 | Risk threshold | The alert's risk level is below `response.min_risk_level` |
+| 2 | Valid IP | The alert has no source IP, or it is not a valid IP (see above) |
+| 3 | Blockable address | The IP is unspecified, loopback, multicast, link-local or reserved |
+| 4 | Allowlist | The IP is inside `response.allowlist` |
+| 5 | Self-lockout protection | The IP is an admin range, the current SSH peer, the default gateway or an address of this host (see below) |
+| 6 | Per-run budget | `response.max_blocks_per_run` blocks were already made in the current hourly window |
+| 7 | Failure pause | Five consecutive firewall failures; automatic attempts resume in the next hourly window |
+| 8 | Hourly circuit breaker | `response.max_blocks_per_hour` recorded response actions in the last hour, or the block history cannot be read (decision `circuit_breaker`; needs the alert store) |
+| 9 | Cooldown | The same IP was attempted less than `response.cooldown_seconds` ago in this process (a failed attempt also starts the cooldown) |
+| 10 | Already blocked | `is_blocked(ip)` reports the IP is already blocked |
+
+The per-run budget and the failure streak reset every hour of clock time, so a
+long-running `sentinel live` gets a fresh budget each hour.
+
+If all checks pass, `response.mode` decides the outcome: `auto` blocks
+immediately, `approval` queues a request for a human (below). When
+`response.temporary_block` is true the block is a `temporary_block` of
+`block_duration_seconds`; otherwise it is a permanent `block_ip`.
+
+### Failure handling
+
+- **Record first.** In `auto` mode the block is written to the alert store
+  (`<state_dir>/alerts.db`) *before* the firewall is called. If it cannot be
+  recorded, the block is refused and audited as `failed`, so a temporary block
+  can never silently become permanent because nobody tracked its expiry. If the
+  firewall then fails, the record is marked `failed`.
+- **Adapter errors are failed actions.** Any exception raised by a firewall
+  adapter is turned into a failed action (only the exception class name is kept
+  in records). It cannot crash detection or `sentinel live`.
+- **Backoff.** A failed attempt starts the per-IP cooldown. Five consecutive
+  failures pause automatic attempts until the next hourly window; a successful
+  block resets the streak.
+
+### Self-lockout protection
+
+`LockoutGuard` refuses to block an address that could cut the operator off from
+the machine. It checks, in this order, and each check except `admin_ranges` can
+be switched off:
+
+| Check | Switch | Protects |
+|-------|--------|----------|
+| Admin ranges | `response.admin_ranges` (empty by default) | Any IP/CIDR you list, e.g. your office or VPN range |
+| SSH peer | `response.protect_ssh_peer` (default `true`) | The client address of the current SSH session, read from `SSH_CONNECTION` or `SSH_CLIENT` in SentinelAI's environment |
+| Default gateway | `response.protect_gateway` (default `true`) | The default IPv4 gateway(s) from `/proc/net/route` (Linux only) |
+| Own addresses | `response.protect_own_addresses` (default `true`) | Loopback and the host's own addresses (hostname resolution plus the source address of the default route) |
+
+A protected IP is skipped with the reason `self-lockout protection: ...`.
+Addresses are compared in canonical form (IPv4-mapped IPv6 counts as IPv4). The
+guard never raises and fails closed: if it hits an unexpected internal error
+(for example the gateway lookup fails), it reports `could not evaluate lockout
+protection` and the block is refused.
+
+### Approval mode
+
+With `response.mode: approval`, SentinelAI never blocks by itself. An alert that
+passes the decision order is stored as a pending request (decision `queued`).
+
+- At most one open request per IP; a further alert for the same IP is skipped as
+  "already pending approval".
+- The queue is capped at `max(100, 10 x max_blocks_per_hour)` open requests; when
+  it is full, new requests are skipped as "approval queue is full".
+
+```bash
+sentinel respond --pending                      # list requests awaiting a decision
+sentinel respond --approve 7 --note "confirmed" # block the IP of request #7
+sentinel respond --deny 8 --note "known scanner"
+```
+
+- Approval **re-checks policy at decision time**: valid IP, blockable address,
+  allowlist, self-lockout protection, hourly circuit breaker and "already
+  blocked". The world may have changed since the request was queued.
+  (Per-run budget, failure pause and cooldown apply to automatic blocks only.)
+  The outcome depends on why a check fails:
+  - **Permanent reason** (allowlisted, protected, invalid or never-blockable
+    address): the request is marked denied, the reason is audited, and nothing
+    is blocked.
+  - **Transient reason** (hourly breaker open, IP already blocked): the request
+    stays pending and the command reports "try again later".
+- Approval is atomic: the request is claimed once, so two concurrent approvals
+  cannot both block, and a request that was already decided cannot be approved
+  again. If the block cannot be recorded or the firewall fails, the claim is
+  released and the request can be retried.
+- Stale requests cannot be approved. Pending requests expire after
+  `response.pending_expire_seconds` (default 24 h) and are then recorded as
+  `expired`. Expiry is applied whenever the queue is listed, reaped or approved.
+- `--approve` and `--deny` are repeatable. Exit code is 1 if any request failed.
+
+### Audit log
+
+Every decision is appended to `<state_dir>/response/audit.jsonl`, one JSON
+object per line. This includes decisions where nothing was blocked, so "why was
+this IP not blocked?" has an answer. Two things are deliberately not logged, to
+keep the file useful under a flood of alerts:
+
+- Skips for "risk below threshold" (the alert is not a blocking candidate).
+- Repeated identical skips: the same IP and reason is logged at most once per
+  minute.
+
+| Decision | Meaning |
+|----------|---------|
+| `blocked` | A block was applied |
+| `skipped` | Policy decided not to act; `reason` says why |
+| `queued` | A request is waiting for approval |
+| `approved` | An operator approved a request |
+| `denied` | An operator denied a request, or a re-check refused the approval for a permanent reason |
+| `failed` | The firewall reported failure or raised, the block could not be recorded, or a request could not be queued |
+| `reaped` | A temporary block was removed after its TTL expired |
+| `rolled_back` | A block was removed by `--rollback` |
+| `expired` | Pending requests timed out |
+| `circuit_breaker` | The hourly cap stopped a block, or the block history could not be read |
+
+Each record has `ts` (UTC), `event` (`response`), `decision` and, when known,
+`ip`, `reason`, `alert_id`, `rule_id`, `risk_level`, `mode`, `run_id`. Strings
+are stripped of control characters and capped at 500 characters, so log-derived
+text cannot forge extra lines. A failed write is logged and never stops
+detection.
+
+The file rotates at 10 MB: `audit.jsonl` becomes `audit.jsonl.1`, older files
+shift up, and 5 rotated files are kept (the oldest is deleted).
+`sentinel respond --history` continues into the rotated files when the active
+one holds fewer records than requested.
+
+```bash
+sentinel respond --history            # last 20 decisions
+sentinel respond --history --limit 100
+```
+
+### TTL enforcement and reaping
+
+Most firewall tools (UFW, for example) have no native rule expiry. SentinelAI
+therefore does not rely on the firewall to remove temporary blocks: every
+temporary block is recorded with an expiry time in the alert store
+(`<state_dir>/alerts.db`) before the firewall is called, and SentinelAI calls
+`unblock_ip` itself when the time is up. The block is then marked `reaped` and
+audited.
+
+- `sentinel respond --reap` removes all due blocks now.
+- `sentinel live` reaps automatically every `response.reap_interval_seconds`
+  (default 60), only when `response.enabled` is true.
+- `sentinel scan` reaps at the start of the run, only when `response.enabled`
+  is true.
+- If `unblock_ip` fails, the block stays due and is retried on the next reap.
+- Reap and rollback never remove an IP that a longer-lived block still covers.
+  The row is marked `reaped` / `rolled_back` with the detail "IP stays blocked by a
+  longer-lived block", and the firewall is not called.
+- Permanent blocks (`response.temporary_block: false`) have no expiry and are
+  removed only with `--rollback` or by your firewall tooling.
+
+### Rollback
+
+```bash
+sentinel respond --rollback --since 2h       # blocks applied in the last 2 hours
+sentinel respond --rollback --run RUN_ID     # blocks made by one run
+```
+
+`--since` accepts `30m`, `2h`, `3d` or an ISO-8601 time (no timezone means UTC).
+Only blocks still in the `applied` state are unblocked; each one is audited as
+`rolled_back`.
+
+### Confirmation
+
+`--approve`, `--deny`, `--reap` and `--rollback` ask for confirmation before they
+change anything. The prompt first lists what will happen: for `--approve` and
+`--deny`, one line per request as `#id ip (rule, risk)` (ids that are unknown,
+already decided or expired are reported and left out); for `--reap` and
+`--rollback`, the IPs that will be unblocked (first 50). `--yes` skips the
+prompt and the listing. Without a terminal and without `--yes` the command
+refuses and exits with code 1. `--pending` and `--history`
+are read-only and never prompt.
+
+### `sentinel respond` options
+
+Exactly one action per call.
+
+| Option | Description |
+|--------|-------------|
+| `--pending` | List responses awaiting approval |
+| `--approve ID` | Approve a pending response and block its IP (repeatable) |
+| `--deny ID` | Deny a pending response; nothing is blocked (repeatable) |
+| `--note TEXT` | Reason stored with `--approve` / `--deny` |
+| `--reap` | Unblock expired temporary blocks now |
+| `--rollback` | Undo applied blocks; needs `--since` or `--run` |
+| `--since TEXT` | With `--rollback`: blocks since `30m` / `2h` / `3d` ago or an ISO-8601 time |
+| `--run RUN_ID` | With `--rollback`: blocks of this run id |
+| `--history` | Show the response audit trail |
+| `--limit N` | With `--history`: number of records (default `20`) |
+| `--yes` | Skip the confirmation prompt |
+
+### Reference adapter: UFW
+
+[`examples/firewall_adapter_ufw.py`](examples/firewall_adapter_ufw.py) is a
+ready-made `FirewallController` for UFW. It is meant to be **copied into your own
+firewall project**; SentinelAI core never imports it. It runs `ufw` with list
+arguments only (no shell), validates every IP with `ipaddress` first (input with
+`%`, whitespace or `/` is rejected; IPv4-mapped IPv6 becomes IPv4), and refuses
+private, loopback, multicast, unspecified and link-local targets. Its
+`temporary_block` only installs the deny rule; expiry is done by SentinelAI's
+reaper through `unblock_ip` (see above).
+
+- Blocks use `ufw insert 1 deny from <ip>`. UFW is first match, so an appended
+  rule could be shadowed by an earlier ALLOW rule.
+- `sudo -n` is the default prefix, so a missing NOPASSWD rule fails immediately
+  instead of waiting for a password. Allow only the needed `ufw` commands in
+  sudoers.
+- Every call runs with stdin closed and `LC_ALL=C LANG=C`, so output parsing does
+  not depend on the locale.
+- A block is refused (returns `False`, warning logged) while `ufw status`
+  reports `Status: inactive`, because the rule would not be enforced.
+- `ufw insert 1` fails on a completely empty rule set, so the first block on
+  such a system is reported as failed.
+
+```yaml
+firewall:
+  adapter: python
+  module: firewall_adapter_ufw        # wherever you copied the file
+  attribute: UfwFirewall
+  init_kwargs:
+    sudo_prefix: ["sudo", "-n"]       # default; [] when running as root
+    ufw_binary: ufw
+    timeout_seconds: 15
+```
+
+Your existing `firewall_manager.py` cannot be imported or driven as it is: it
+runs a top-level interactive menu loop with no `if __name__ == "__main__":`
+guard, so importing it starts the menu, and it has no unblock or list function,
+which temporary blocks and rollback need. Either copy the UFW adapter, or
+refactor that file to expose a class with the five `FirewallController` methods
+and guard the menu.
+
+### Configuration
+
+All keys live under `response` (see [`config.example.yaml`](config.example.yaml)).
+The existing keys (`enabled`, `min_risk_level`, `temporary_block`,
+`block_duration_seconds`, `cooldown_seconds`, `max_blocks_per_run`, `allowlist`)
+are unchanged. New keys:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `mode` | `auto` | `auto` blocks immediately; `approval` queues requests for `sentinel respond` |
+| `admin_ranges` | `[]` | IPs/CIDRs that are never blocked (your admin or VPN networks) |
+| `protect_ssh_peer` | `true` | Never block the client address of the current SSH session |
+| `protect_gateway` | `true` | Never block the default gateway (Linux only) |
+| `protect_own_addresses` | `true` | Never block the host's own addresses |
+| `max_blocks_per_hour` | `30` | Hourly circuit breaker across runs; positive integer. Also sets the approval queue cap, `max(100, 10 x value)` |
+| `pending_expire_seconds` | `86400` | Age after which an unapproved request expires; positive integer |
+| `reap_interval_seconds` | `60` | How often `sentinel live` reaps expired blocks; positive integer |
+
+### Limitations
+
+- Gateway detection reads `/proc/net/route`, so it works on Linux only, and
+  only finds IPv4 gateways. Elsewhere `protect_gateway` protects nothing.
+- SSH-peer protection only knows the session that launched SentinelAI (from its
+  environment). A SentinelAI started by systemd or cron has no such session, and
+  other administrators' sessions are not known. List those networks in
+  `admin_ranges`.
+- The host's own addresses are a best-effort lookup (hostname resolution and the
+  default-route source address), not a full interface scan.
+- Run ids of operator-approved blocks are `operator`, so `--rollback --run` cannot
+  tell them apart from each other. Roll them back with `--since`.
+- The per-run budget, the cooldown and the failure streak are held in memory and
+  reset when the process restarts; only the hourly circuit breaker is persisted.
+- The audit log is append-only by convention of the code, not enforced by the
+  filesystem. Rotation keeps 5 files of 10 MB, so older records are deleted.
+  Protect it with file permissions or ship it elsewhere.
+- With the example UFW adapter, the first block on a completely empty UFW rule
+  set fails (`ufw insert 1` needs an existing rule), and no block is made while
+  UFW is inactive. Both count as failed attempts toward the five-failure pause.
 
 ---
 
