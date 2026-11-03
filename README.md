@@ -123,8 +123,8 @@ Packages (`src/sentinelai/`):
 Requires **Python 3.10+**.
 
 ```bash
-git clone https://github.com/3mr3ren/sentinelai.git
-cd sentinelai
+git clone https://github.com/E2xCoder/SentinelAI.git
+cd SentinelAI
 
 python -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\activate

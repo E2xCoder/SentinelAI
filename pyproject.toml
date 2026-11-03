@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sentinelai"
-version = "1.0.0"
+version = "0.1.0"
 description = "AI-assisted security log analysis, detection and automated response platform for Linux systems."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ keywords = [
     "anomaly-detection", "blue-team", "soc", "detection-engineering",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Information Technology",
@@ -52,8 +52,8 @@ dev = [
 sentinel = "sentinelai.cli.app:main"
 
 [project.urls]
-Homepage = "https://github.com/3mr3ren/sentinelai"
-Documentation = "https://github.com/3mr3ren/sentinelai#readme"
+Homepage = "https://github.com/E2xCoder/SentinelAI"
+Documentation = "https://github.com/E2xCoder/SentinelAI#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]
