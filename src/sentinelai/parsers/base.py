@@ -17,7 +17,7 @@ from sentinelai.utils.logging import get_logger
 
 _LOGGER = get_logger("parsers")
 
-_REGISTRY: dict[str, type["LogParser"]] = {}
+_REGISTRY: dict[str, type[LogParser]] = {}
 
 P = TypeVar("P", bound=type["LogParser"])
 

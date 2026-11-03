@@ -7,6 +7,7 @@ size regression, so logrotate never silently kills the stream.
 
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 from typing import IO
@@ -90,10 +91,8 @@ class LogTailer:
 
     def _close_handle(self) -> None:
         if self._handle is not None:
-            try:
+            with contextlib.suppress(OSError):
                 self._handle.close()
-            except OSError:
-                pass
         self._handle = None
         self._inode = None
         self._position = 0

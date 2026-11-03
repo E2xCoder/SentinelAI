@@ -100,9 +100,12 @@ def _apply_dict(obj: Any, data: dict[str, Any], path: str = "") -> None:
             continue
         if isinstance(current, bool) and not isinstance(value, bool):
             raise ConfigError(f"Config key {dotted!r} must be true/false")
-        if isinstance(current, (int, float)) and not isinstance(current, bool):
-            if not isinstance(value, (int, float)):
-                raise ConfigError(f"Config key {dotted!r} must be a number")
+        if (
+            isinstance(current, (int, float))
+            and not isinstance(current, bool)
+            and not isinstance(value, (int, float))
+        ):
+            raise ConfigError(f"Config key {dotted!r} must be a number")
         if isinstance(current, list) and not isinstance(value, list):
             raise ConfigError(f"Config key {dotted!r} must be a list")
         if isinstance(current, str) and not isinstance(value, (str, int, float)):

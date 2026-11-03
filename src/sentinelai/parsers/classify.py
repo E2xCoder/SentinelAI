@@ -9,9 +9,10 @@ one-line addition.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from re import Match, Pattern
-from typing import Any, Callable
+from typing import Any
 
 from sentinelai.core.models import EventCategory, EventType, Severity
 

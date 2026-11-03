@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 
 from rich.console import Console
@@ -17,10 +18,8 @@ from sentinelai.reporting.report import Report
 for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, "reconfigure", None)
     if reconfigure is not None:
-        try:
+        with contextlib.suppress(ValueError, OSError):
             reconfigure(encoding="utf-8", errors="replace")
-        except (ValueError, OSError):
-            pass
 
 console = Console()
 error_console = Console(stderr=True)

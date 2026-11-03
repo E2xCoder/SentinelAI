@@ -17,7 +17,7 @@ from sentinelai.core.exceptions import SentinelError
 from sentinelai.core.models import Alert, EventCategory, LogEvent, Severity
 from sentinelai.detection.state import SlidingWindowStore
 
-_RULE_REGISTRY: dict[str, type["Rule"]] = {}
+_RULE_REGISTRY: dict[str, type[Rule]] = {}
 
 R = TypeVar("R", bound=type["Rule"])
 

@@ -7,7 +7,8 @@ existing code changes when a model is added.
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from sentinelai.core.exceptions import AIError
 

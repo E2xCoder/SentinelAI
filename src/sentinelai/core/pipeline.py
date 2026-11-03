@@ -36,11 +36,11 @@ class ScanStatistics:
     """Aggregate statistics of one analysis run."""
 
     total_events: int = 0
-    categories: Counter = field(default_factory=Counter)
-    severities: Counter = field(default_factory=Counter)
-    unique_ips: set = field(default_factory=set)
-    unique_users: set = field(default_factory=set)
-    unique_hosts: set = field(default_factory=set)
+    categories: Counter[str] = field(default_factory=Counter)
+    severities: Counter[str] = field(default_factory=Counter)
+    unique_ips: set[str] = field(default_factory=set)
+    unique_users: set[str] = field(default_factory=set)
+    unique_hosts: set[str] = field(default_factory=set)
     first_event: datetime | None = None
     last_event: datetime | None = None
 

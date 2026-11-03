@@ -78,7 +78,7 @@ class AIEngine:
         threshold = self._config.anomaly_alert_threshold
         return [
             (event, score)
-            for event, score in zip(events, scores)
+            for event, score in zip(events, scores, strict=True)
             if score >= threshold
         ]
 

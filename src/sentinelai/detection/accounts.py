@@ -136,10 +136,7 @@ def _matches_allowlist(username: str, patterns: list[str]) -> bool:
 
     Patterns support shell-style wildcards via :func:`fnmatch.fnmatch`.
     """
-    for pattern in patterns:
-        if fnmatch.fnmatch(username, pattern):
-            return True
-    return False
+    return any(fnmatch.fnmatch(username, pattern) for pattern in patterns)
 
 
 def classify_account(
@@ -161,7 +158,7 @@ def classify_account(
         try:
             uid_int = int(uid)
         except (ValueError, TypeError):
-            uid_int = None
+            pass
         else:
             if uid_int == 0:
                 return AccountKind.PRIVILEGED

@@ -13,7 +13,6 @@ from sentinelai.core.models import (
     Severity,
 )
 from sentinelai.risk.engine import RiskEngine
-
 from tests.conftest import BASE_TS
 
 

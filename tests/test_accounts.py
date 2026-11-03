@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from sentinelai.detection.accounts import (
-    AccountKind,
     _BUILTIN_SERVICE_ACCOUNTS,
+    AccountKind,
     classify_account,
     read_uid_min,
 )

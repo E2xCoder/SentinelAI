@@ -20,7 +20,6 @@ from sentinelai.detection.rules.persistence import (
 from sentinelai.detection.rules.privilege import PrivilegeEscalationRule, SudoAbuseRule
 from sentinelai.detection.rules.system import FirewallModificationRule
 from sentinelai.detection.rules.users import NewUserRule
-
 from tests.conftest import make_event
 
 
@@ -239,7 +238,7 @@ class TestNewUser:
                 event_type=EventType.USER_ADDED, user=name,
                 service="useradd", uid="2001",
             )
-            assert rule.evaluate(event, rule_ctx) is None, f"{name} should be suppressed by custom allowlist"
+            assert rule.evaluate(event, rule_ctx) is None, f"{name} not suppressed"
         rule_ctx.config.service_account_allowlist = []
 
     def test_custom_uid_min(self, rule_ctx) -> None:

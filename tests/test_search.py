@@ -9,7 +9,6 @@ import pytest
 from sentinelai.core.exceptions import SentinelError
 from sentinelai.core.models import EventCategory, EventType, Severity
 from sentinelai.search.query import build_query, parse_date_bound
-
 from tests.conftest import make_event
 
 

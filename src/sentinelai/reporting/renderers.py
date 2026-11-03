@@ -10,7 +10,7 @@ import csv
 import html
 import io
 import json
-from typing import Callable
+from collections.abc import Callable
 
 from sentinelai.core.models import RiskLevel
 from sentinelai.reporting.report import Report

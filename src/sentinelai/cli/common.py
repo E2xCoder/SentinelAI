@@ -26,7 +26,8 @@ class Context:
 
 def load_context(ctx: click.Context) -> Context:
     """Return the :class:`Context` attached to the click context."""
-    return ctx.obj  # type: ignore[return-value]
+    obj: Context = ctx.obj
+    return obj
 
 
 def build_pipeline(config: SentinelConfig) -> AnalysisPipeline:

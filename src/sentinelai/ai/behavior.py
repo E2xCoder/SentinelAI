@@ -23,9 +23,9 @@ class BehaviorProfile:
     event_count: int = 0
     failure_count: int = 0
     success_count: int = 0
-    categories: Counter = field(default_factory=Counter)
-    active_hours: Counter = field(default_factory=Counter)
-    peers: Counter = field(default_factory=Counter)  # IPs for users, users for IPs
+    categories: Counter[str] = field(default_factory=Counter)
+    active_hours: Counter[int] = field(default_factory=Counter)
+    peers: Counter[str] = field(default_factory=Counter)  # IPs for users, users for IPs
 
     @property
     def failure_ratio(self) -> float:

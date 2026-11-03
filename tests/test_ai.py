@@ -11,7 +11,6 @@ from sentinelai.ai.features import FeatureExtractor
 from sentinelai.ai.isolation_forest import SKLEARN_AVAILABLE
 from sentinelai.config.models import AIConfig
 from sentinelai.core.models import Alert, EventCategory, EventType, Severity
-
 from tests.conftest import make_event
 
 pytestmark = pytest.mark.skipif(
@@ -85,7 +84,7 @@ class TestAnomalyDetection:
 class TestBehaviorAnalysis:
     def test_profiles_track_failures(self) -> None:
         engine = AIEngine(AIConfig())
-        for i in range(5):
+        for _ in range(5):
             engine.observe(
                 make_event(
                     event_type=EventType.AUTH_FAILURE, ip="203.0.113.5", user="root"

@@ -18,7 +18,7 @@ from sentinelai.utils.logging import get_logger
 
 _LOGGER = get_logger("ai.explain")
 
-_PROMPT_TEMPLATE = """You are a senior SOC analyst. Analyze this security alert and answer concisely.
+_PROMPT_TEMPLATE = """You are a senior SOC analyst. Analyze this alert and answer concisely.
 
 ALERT
 Title: {title}
