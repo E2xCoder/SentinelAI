@@ -19,12 +19,14 @@ from rich.panel import Panel
 from rich.table import Table
 
 from sentinelai.cli import console as ui
-from sentinelai.cli.common import fail
+from sentinelai.cli.common import fail, load_context
+from sentinelai.config.models import SentinelConfig
 from sentinelai.core.exceptions import EvaluationError, SentinelError
 from sentinelai.evaluation.compare import Regression, Thresholds, compare_reports, load_baseline
 from sentinelai.evaluation.manifest import verify_manifest, write_manifest
 from sentinelai.evaluation.models import EvalReport, ScenarioResult
 from sentinelai.evaluation.runner import load_scenarios, run_benchmark
+from sentinelai.evaluation.triage_eval import run_triage_eval
 
 
 def _pct(value: object) -> str:
@@ -142,6 +144,49 @@ def _print_regressions(regressions: list[Regression], *, to_stderr: bool) -> Non
         out.print(f"  [red]{escape(reg.kind)}[/red] {escape(reg.message)}")
 
 
+def _triage_table(data: dict[str, Any]) -> Table:
+    latency = data.get("latency", {})
+    table = Table(title="LLM triage (advisory)", header_style="bold")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Model", escape(f"{data.get('provider', '-')}/{data.get('model', '-')}"))
+    table.add_row("Alerts triaged", str(data.get("alerts", 0)))
+    table.add_row("Valid-answer rate", _pct(data.get("schema_valid_rate")))
+    table.add_row("Agreement (not benign)", _pct(data.get("agreement_rate")))
+    table.add_row("Malicious rate", _pct(data.get("malicious_rate")))
+    table.add_row("Fallbacks (template)", _pct(data.get("fallback_rate")))
+    table.add_row("Latency p50", f"{float(latency.get('p50', 0.0)):.2f}s")
+    table.add_row("Latency p95", f"{float(latency.get('p95', 0.0)):.2f}s")
+    rejections = data.get("rejections", {})
+    for reason, count in list(rejections.items())[:5]:
+        table.add_row(f"Rejected: {escape(str(reason))}", str(count))
+    return table
+
+
+def _require_triage_llm(config: SentinelConfig) -> None:
+    if not config.ai.llm.enabled:
+        raise EvaluationError(
+            "--triage needs the LLM to be enabled. Set ai.llm.enabled: true (plus "
+            "ai.llm.model and ai.llm.endpoint) in config.yaml. Nothing was sent anywhere."
+        )
+
+
+def _run_triage(
+    config: SentinelConfig,
+    benchmarks: Path,
+    limit: int,
+    output: Path | None,
+    *,
+    to_stderr: bool,
+) -> None:
+    data = run_triage_eval(benchmarks / "scenarios", config.ai.llm, limit=limit)
+    out = ui.error_console if to_stderr else ui.console
+    out.print(_triage_table(data))
+    out.print("[dim]Triage verdicts are advisory and do not affect the exit code.[/dim]")
+    if output is not None:
+        _write_json(output, data)
+
+
 @click.command("eval")
 @click.option(
     "--benchmarks",
@@ -186,7 +231,26 @@ def _print_regressions(regressions: list[Regression], *, to_stderr: bool) -> Non
     help="Tolerated rise of FP per 1k benign events.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Print the JSON report to stdout.")
+@click.option(
+    "--triage",
+    is_flag=True,
+    help="Also triage attack-scenario alerts with the configured LLM (advisory, needs ai.llm).",
+)
+@click.option(
+    "--triage-limit",
+    type=click.IntRange(min=1),
+    default=25,
+    show_default=True,
+    help="Maximum number of alerts to triage.",
+)
+@click.option(
+    "--triage-output",
+    type=click.Path(path_type=Path),
+    help="Write the triage evaluation JSON to this path.",
+)
+@click.pass_context
 def eval_cmd(
+    ctx: click.Context,
     benchmarks: Path,
     baseline: Path | None,
     write_baseline: Path | None,
@@ -195,10 +259,16 @@ def eval_cmd(
     max_recall_drop: float,
     max_fp_increase: float,
     as_json: bool,
+    triage: bool,
+    triage_limit: int,
+    triage_output: Path | None,
 ) -> None:
     """Run the frozen detection benchmark and report precision/recall."""
     regressions: list[Regression] = []
+    config = load_context(ctx).config
     try:
+        if triage:
+            _require_triage_llm(config)
         thresholds = Thresholds(max_recall_drop=max_recall_drop, max_fp_increase=max_fp_increase)
         if update_manifest:
             # Validate the benchmark first so an invalid one never gets a fresh manifest.
@@ -236,6 +306,9 @@ def eval_cmd(
                 report.to_dict(), load_baseline(baseline), thresholds
             )
             _print_regressions(regressions, to_stderr=as_json)
+
+        if triage:
+            _run_triage(config, benchmarks, triage_limit, triage_output, to_stderr=as_json)
     except SentinelError as exc:
         fail(exc)
 

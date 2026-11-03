@@ -140,14 +140,32 @@ ai:
   min_events: 50                  # minimum events before anomaly detection runs
   anomaly_alert_threshold: 0.75   # 0..1; higher = fewer, stronger anomalies
 
-  # Optional local LLM for `sentinel explain` (Ollama-compatible).
-  # When disabled/unreachable, a deterministic template explanation is used.
+  # Optional LLM for structured triage in `sentinel explain` and
+  # `sentinel eval --triage`. The model must answer with a JSON verdict
+  # (benign|suspicious|malicious, confidence, summary, reasoning, actions,
+  # cited event numbers) that is validated strictly. When disabled, unreachable
+  # or when the answer is rejected, a deterministic template is used instead.
+  # The verdict is ADVISORY: it never changes risk scores, alerts or responses.
+  # Requests do not follow redirects, responses are capped at 1 MB, and proxy
+  # environment variables and ~/.netrc are ignored.
   llm:
     enabled: false
+    provider: "ollama"              # ollama | openai (OpenAI-compatible server)
     endpoint: "http://localhost:11434"
     model: "llama3.1"
-    timeout_seconds: 60.0
+    language: "en"                  # en | tr | de
+    timeout_seconds: 60.0           # per request and total read deadline; > 0, <= 600
     max_tokens: 700
+    max_retries: 1                  # 0..3 retries, transient failures only
+                                    # (network, timeout, HTTP 429/5xx)
+    retry_backoff_seconds: 1.0      # base delay, doubled on each retry; 0..60
+    cache_ttl_seconds: 604800       # cache validated verdicts for 7 days; 0 = off
+    # WARNING: do not put a real API key in this file. Only needed for
+    # provider: openai. Set it in the environment instead:
+    #   SENTINELAI_AI_LLM_API_KEY=xxxx
+    # The key is only sent over https:// or to a loopback address; any other
+    # endpoint together with a key is rejected at startup.
+    api_key: ""
 
 # -----------------------------------------------------------------------------
 # Firewall integration — SentinelAI contains NO firewall logic of its own.

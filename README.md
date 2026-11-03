@@ -26,7 +26,7 @@ firewall automation through a clean adapter boundary.
 - [Evaluation benchmark](#evaluation-benchmark)
 - [Feedback and tuning](#feedback-and-tuning)
 - [Threat detection example](#threat-detection-example)
-- [AI explanation example](#ai-explanation-example)
+- [Structured LLM triage](#structured-llm-triage)
 - [Firewall integration](#firewall-integration)
 - [Development guide](#development-guide)
 - [Extending SentinelAI](#extending-sentinelai)
@@ -50,8 +50,8 @@ firewall automation through a clean adapter boundary.
 - **Explained risk scoring** — every alert gets a 0–100 score with a per-factor
   breakdown of *why*.
 - **AI engine** — Isolation Forest anomaly detection, behavior profiling,
-  multi-stage attack-pattern recognition, and alert explanation via an optional
-  local LLM (with a deterministic fallback).
+  multi-stage attack-pattern recognition, and advisory alert triage via an
+  optional local LLM (schema-validated, with a deterministic fallback).
 - **Threat intelligence** — AbuseIPDB, VirusTotal and AlienVault OTX with disk
   caching, rate limiting and graceful degradation.
 - **Automated response** — blocks malicious sources through *your* firewall
@@ -213,6 +213,7 @@ sentinel config
 | `sentinel report <file>`   | Summarize a previously generated JSON report             |
 | `sentinel rules`           | List all detection rules with MITRE mappings             |
 | `sentinel eval`            | Run the frozen detection benchmark (precision/recall)    |
+| `sentinel eval --triage`   | Also measure the configured LLM's triage (advisory only) |
 | `sentinel feedback <id>`   | Label a stored alert as true (`--tp`) or false (`--fp`) positive |
 | `sentinel review`          | Interactively label recent, unlabelled alerts            |
 | `sentinel tune`            | Propose, gate and (`--apply`) apply feedback-driven tuning |
@@ -385,11 +386,15 @@ sentinel eval --json                                 # JSON report on stdout
 | `--max-recall-drop <x>` | Tolerated recall drop, 0..1 (default `0.0`)                     |
 | `--max-fp-increase <x>` | Tolerated rise of FP per 1k benign events (default `0.0`)       |
 | `--json`                | Print the JSON report to stdout                                 |
+| `--triage`              | Also triage attack-scenario alerts with the configured LLM (advisory, needs `ai.llm.enabled`) |
+| `--triage-limit <n>`    | Maximum number of alerts to triage (default `25`)               |
+| `--triage-output <file>`| Write the triage evaluation as JSON to this path                |
 
 The exit code is 1 if any scenario fails or any regression against the baseline
 is found (lower overall or per-rule recall beyond the threshold, higher
 false-positive rate, a previously passing scenario that now fails or is
-missing, or a changed report `schema_version`).
+missing, or a changed report `schema_version`). The `--triage` results never
+affect the exit code; see [Choosing a local model](#choosing-a-local-model).
 
 ### Frozen benchmark
 
@@ -610,11 +615,11 @@ source, and named it a multi-stage intrusion.
 
 ---
 
-## AI explanation example
+## Structured LLM triage
 
-`sentinel explain 8` produces a SOC-analyst-style breakdown. With no local LLM it
-uses a deterministic template; with one configured (`ai.llm.enabled: true`) it
-uses the model — the output shape is identical:
+`sentinel explain <id>` explains a stored alert. With no LLM configured
+(`ai.llm.enabled: false`, the default) it prints a deterministic template built
+from the rule metadata, risk factors and threat intelligence:
 
 ```
 WHY SUSPICIOUS: Content matching a reverse-shell payload was observed
@@ -628,7 +633,170 @@ volatile state, and identify the remote endpoint of the shell.
 CONFIDENCE: 85
 ```
 
-To enable the local LLM, point `ai.llm.endpoint` at an Ollama-compatible server.
+With `ai.llm.enabled: true` the alert is sent to a local (or OpenAI-compatible)
+model, which must answer with a structured verdict:
+
+| Field                   | Content                                                       |
+|-------------------------|---------------------------------------------------------------|
+| `verdict`               | `benign`, `suspicious` or `malicious`                         |
+| `confidence`            | Number from 0 to 1                                            |
+| `summary`               | Short statement (max 400 characters)                          |
+| `reasoning`             | Why the model decided so (max 1500 characters)                |
+| `recommended_actions`   | Up to 5 actions (max 200 characters each)                     |
+| `referenced_event_ids`  | Numbers (1-based, as listed in the prompt) of the events the verdict relies on |
+
+The result is printed in the four-line format above (labels follow
+`ai.llm.language`; the `POTENTIAL ATTACK` line carries the verdict), followed by a
+`Triage verdict (advisory)` line with the verdict, confidence and whether it came
+from the model or the template fallback. The full record, including the
+referenced event numbers, the source (`llm:<model>`, `cache:<model>` or
+`template`) and the reason a model answer was rejected, is stored with the alert.
+
+**The verdict is advisory only.** It never changes the risk score, never creates
+or suppresses an alert, and never triggers or blocks an automated response.
+Scoring, detection and response stay rule- and policy-based.
+
+### How model output is validated
+
+Nothing the model returns is trusted:
+
+- **Structured output.** The request carries the JSON schema of the answer:
+  Ollama via `format` (with `/api/chat`), OpenAI-compatible servers via
+  `response_format` of type `json_schema` (strict, with `/v1/chat/completions`).
+  Temperature is 0.
+- **Strict check on the client.** The server-side constraint is not relied upon.
+  The answer must be one JSON object with exactly the six keys above; an invalid
+  or non-JSON answer, duplicate keys, an unknown or missing key, a wrong type, a
+  verdict outside the three values, a confidence outside 0..1, an over-long
+  field, or a response above the size limit is rejected.
+- **Grounding.** `referenced_event_ids` may only cite events that were in the
+  prompt (E1..En, at most 5). Citing an event number that was not provided
+  rejects the whole answer.
+- **Retries and fallback.** Only transient failures are retried: network
+  errors, timeouts, a response that is too slow, and HTTP 429 or 5xx. Retries
+  are made up to `max_retries` times with exponential backoff
+  (`retry_backoff_seconds * 2^attempt`) and stop once a total time budget of
+  `timeout_seconds * (max_retries + 1)` is exceeded. Invalid or ungrounded
+  answers, other HTTP errors and oversized responses are not retried. If no
+  valid answer arrives, the deterministic template is used and the reason is
+  recorded. A failure in triage never aborts `sentinel explain`.
+- **Network hardening.** Redirects are not followed, a response is read for at
+  most 1 MB, and the whole read must finish within `timeout_seconds`. Proxy
+  settings from the environment and `~/.netrc` are ignored.
+- **API key.** The key is sent only over `https://` or to a loopback address
+  (`localhost`, `127.0.0.0/8`, `::1`); the configuration is rejected otherwise.
+  It is excluded from `repr` output and from error messages. Set it with
+  `SENTINELAI_AI_LLM_API_KEY`.
+- **Cache.** Only validated answers are cached, in `<state_dir>/triage_cache.db`
+  (SQLite), keyed by alert fingerprint, provider, endpoint, model, language and
+  a hash of the prompt. Changing any of these therefore never serves an old
+  verdict. Rows are validated again on every read and a row that fails is
+  deleted; entries expire after `cache_ttl_seconds` and expired rows are purged
+  when the cache is opened. `0` disables caching.
+
+### Prompt-injection handling
+
+Log text is written by whoever can reach the monitored host, so it is treated as
+untrusted data, never as instructions.
+
+| Risk                                          | Countermeasure                                                                 |
+|-----------------------------------------------|--------------------------------------------------------------------------------|
+| Hidden or terminal-control characters         | ANSI/OSC escape sequences, control characters and zero-width/invisible characters are stripped; text is Unicode-normalised (NFKC) and collapsed to one line |
+| Oversized input                               | Every field is truncated (event messages to 300 characters, at most 5 events)  |
+| Log text read as instructions                 | Log-derived text appears only inside one `<<<LOG_DATA ... LOG_DATA>>>` block of the **user** message, never in the system message; the system message states that the block is untrusted data |
+| Forged delimiters ending the data block early | Delimiter markers are removed from the data (repeatedly, so they cannot be reassembled) |
+| Invented evidence                             | Grounding check on `referenced_event_ids` (see above)                          |
+| Model output used for actions                 | The verdict is advisory and cannot trigger a response                          |
+| Terminal injection through explanations       | Explanation text is escaped before printing and control characters are stripped |
+
+#### Injection corpus
+
+`benchmarks/injection/` holds 38 attacker-controlled log strings
+(`cases.yaml`) and `attack_auth.log`, an sshd brute-force log with payloads in
+usernames and trailing text. It is separate from `benchmarks/scenarios/` and is
+not part of `MANIFEST.sha256` or `baseline.json`. `tests/test_triage_injection.py`
+runs it offline and checks that:
+
+- attacker text appears only inside the `LOG_DATA` block of the user message;
+- a simulated vulnerable model, which obeys any instruction outside that block,
+  always takes the honest path;
+- a compromised model whose output is ungrounded (citing events that were not
+  provided) is rejected and the template is used;
+- an accepted verdict leaves the risk score and the automated-response actions
+  identical to a run without the LLM;
+- detection results are unchanged when the payloads are stripped from the log.
+
+### Known limitations
+
+- These measures reduce prompt-injection risk but cannot eliminate it. A model
+  can still be steered into a wrong verdict by crafted log lines, for example a
+  "benign" verdict for a real attack. The delimiters are static and public, so
+  lookalike characters can only be filtered heuristically and may fool the
+  model. This is why the verdict is advisory and cannot trigger any response.
+  Treat it as a second opinion next to the rule-based alert, not as a decision.
+- `recommended_actions` is free text shown to the analyst. It is never executed.
+
+### Configuration
+
+All keys live under `ai.llm` (see [`config.example.yaml`](config.example.yaml)):
+
+| Key                     | Default                  | Description                                           |
+|-------------------------|--------------------------|-------------------------------------------------------|
+| `enabled`               | `false`                  | Use the LLM for `sentinel explain` and `eval --triage` |
+| `provider`              | `ollama`                 | `ollama` or `openai` (any OpenAI-compatible server)   |
+| `endpoint`              | `http://localhost:11434` | Base URL, `http://` or `https://` (with `api_key`: `https://` or loopback only) |
+| `model`                 | `llama3.1`               | Model name sent to the server                         |
+| `language`              | `en`                     | Language of the answer: `en`, `tr` or `de`            |
+| `timeout_seconds`       | `60.0`                   | Per-request timeout and total read deadline; finite, above 0 and at most 600 |
+| `max_tokens`            | `700`                    | Maximum tokens the model may generate                 |
+| `max_retries`           | `1`                      | Retries after a transient failure (0..3)              |
+| `retry_backoff_seconds` | `1.0`                    | Base delay between retries, doubled each attempt; finite, 0..60 |
+| `cache_ttl_seconds`     | `604800` (7 days)        | Lifetime of cached verdicts; `0` disables the cache   |
+| `api_key`               | empty                    | Bearer token for `provider: openai` (not used by Ollama); never shown in `repr` |
+
+Provide the API key through the environment, not the file. It is only sent over
+`https://` or to a loopback address:
+
+```bash
+export SENTINELAI_AI_LLM_API_KEY="xxxxxxxx"
+```
+
+`language` controls the model's answer and the labels of the template fallback.
+The `verdict` value itself is always one of the three English words in the stored
+record.
+
+### Choosing a local model
+
+This project does not ship benchmark numbers for specific models. Quality,
+speed and structured-output support differ per model and per machine, so measure
+on your own hardware. Small instruction-tuned models that support structured
+output are a reasonable starting point; on Ollama, for example, try
+`llama3.1:8b`, `qwen2.5:7b` or `gemma2:9b`, and judge them with
+`sentinel eval --triage`.
+
+`sentinel eval --triage` runs the normal benchmark, then triages the alerts raised
+by the attack scenarios with the configured LLM (it fails early if
+`ai.llm.enabled` is false). Every one of those alerts is a true detection, so a
+`benign` verdict counts as a disagreement.
+
+```bash
+sentinel eval --triage                                    # up to 25 alerts
+sentinel eval --triage --triage-limit 50 --triage-output triage-report.json
+```
+
+| Metric                  | Meaning                                                          |
+|-------------------------|------------------------------------------------------------------|
+| Valid-answer rate       | Share of alerts where the model's answer passed validation       |
+| Agreement (not benign)  | Share of verdicts that are `suspicious` or `malicious`           |
+| Malicious rate          | Share of verdicts that are `malicious`                           |
+| Fallbacks (template)    | Share of alerts that ended with the deterministic template       |
+| Latency p50 / p95       | Median and 95th percentile time per model-answered alert         |
+| Rejected: ...           | Most frequent reasons answers were rejected (top 5 in the table, top 10 in the JSON) |
+
+`--triage-limit` caps the number of alerts (default 25); `--triage-output` writes
+the metrics plus a per-alert list as JSON. The results are informational: they
+do not affect the exit code or the regression gate, and the baseline is never
+touched. Triage runs without the cache, so every alert is sent to the model.
 
 ---
 

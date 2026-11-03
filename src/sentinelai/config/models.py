@@ -273,15 +273,23 @@ class LLMConfig:
     max_retries: int = 1
     retry_backoff_seconds: float = 1.0
     cache_ttl_seconds: int = 604800
-    api_key: str = ""
+    api_key: str = field(default="", repr=False)
 
     def validate(self) -> None:
-        from sentinelai.ai.triage_models import LANGUAGES
+        from sentinelai.ai.triage_models import LANGUAGES, api_key_endpoint_allowed
 
         if self.enabled and not self.endpoint.startswith(("http://", "https://")):
             raise ConfigError("ai.llm.endpoint must be an http(s) URL")
-        if self.timeout_seconds <= 0:
-            raise ConfigError("ai.llm.timeout_seconds must be positive")
+        timeout = self.timeout_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ConfigError("ai.llm.timeout_seconds must be a finite positive number")
+        if timeout > 600:
+            raise ConfigError("ai.llm.timeout_seconds must be at most 600")
         if self.max_tokens <= 0:
             raise ConfigError("ai.llm.max_tokens must be positive")
         if self.provider not in ("ollama", "openai"):
@@ -302,6 +310,8 @@ class LLMConfig:
             or backoff < 0
         ):
             raise ConfigError("ai.llm.retry_backoff_seconds must be a finite number >= 0")
+        if backoff > 60:
+            raise ConfigError("ai.llm.retry_backoff_seconds must be at most 60")
         if (
             isinstance(self.cache_ttl_seconds, bool)
             or not isinstance(self.cache_ttl_seconds, int)
@@ -310,6 +320,11 @@ class LLMConfig:
             raise ConfigError("ai.llm.cache_ttl_seconds must be an integer >= 0")
         if not isinstance(self.api_key, str):
             raise ConfigError("ai.llm.api_key must be a string")
+        if self.api_key and not api_key_endpoint_allowed(self.endpoint):
+            raise ConfigError(
+                "ai.llm.endpoint must use https (or a loopback address) "
+                "when ai.llm.api_key is set"
+            )
 
 
 @dataclass(slots=True)

@@ -27,8 +27,11 @@ def explain(ctx: click.Context, alert_id: int) -> None:
         alert = pipeline.store.get(alert_id)
         if alert is None:
             fail(SentinelError(f"No alert with id {alert_id}. Run a scan first."))
-        engine = AIEngine(context.config.ai)
-        engine.explain(alert)
+        engine = AIEngine(context.config.ai, state_dir=context.config.resolve_state_dir())
+        try:
+            engine.explain(alert)
+        finally:
+            engine.close()
         pipeline.store.update(alert)
         ui.print_alert_detail(alert)
     except SentinelError as exc:

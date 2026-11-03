@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import sys
 
 from rich.console import Console
@@ -40,6 +41,14 @@ _LEVEL_ORDER = [
     RiskLevel.LOW,
     RiskLevel.INFORMATIONAL,
 ]
+
+
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def _safe(value: object) -> str:
+    """Strip terminal control chars (keeps newline/tab), then escape Rich markup."""
+    return escape(_CONTROL_CHARS.sub("", str(value)))
 
 
 def print_banner() -> None:
@@ -84,11 +93,11 @@ def alerts_table(alerts: list[Alert], title: str = "Alerts") -> Table:
             str(alert.id if alert.id is not None else "-"),
             level_text(alert.risk.level),
             f"{alert.risk.score:.0f}",
-            alert.rule_id,
-            alert.ip or "-",
-            alert.user or "-",
+            _safe(alert.rule_id),
+            _safe(alert.ip or "-"),
+            _safe(alert.user or "-"),
             str(alert.event_count),
-            alert.title,
+            _safe(alert.title),
         )
     return table
 
@@ -117,7 +126,7 @@ def summary_panel(report: Report) -> Panel:
     if suppressed_total > 0:
         by_rule = suppressed.get("by_rule", {})
         detail = ", ".join(
-            f"{escape(str(rule))}: {count}" for rule, count in sorted(by_rule.items())
+            f"{_safe(rule)}: {count}" for rule, count in sorted(by_rule.items())
         )
         lines.append(
             f"[bold]Suppressed (analyst rules):[/bold] {suppressed_total}"
@@ -132,7 +141,7 @@ def print_alert_detail(alert: Alert) -> None:
     console.print(
         Panel(
             _alert_body(alert),
-            title=f"[bold]Alert #{alert.id} · {alert.rule_id}[/bold]",
+            title=f"[bold]Alert #{_safe(alert.id)} · {_safe(alert.rule_id)}[/bold]",
             border_style=_LEVEL_STYLE[alert.risk.level].split()[-1],
         )
     )
@@ -140,39 +149,49 @@ def print_alert_detail(alert: Alert) -> None:
 
 def _alert_body(alert: Alert) -> str:
     lines = [
-        f"[bold]{alert.title}[/bold]",
+        f"[bold]{_safe(alert.title)}[/bold]",
         "",
-        alert.description,
+        _safe(alert.description),
         "",
-        f"Risk: {alert.risk.score:.0f}/100 ({alert.risk.level.value})   "
-        f"Severity: {alert.severity.value}",
-        f"Source IP: {alert.ip or 'n/a'}   User: {alert.user or 'n/a'}   "
-        f"Host: {alert.hostname or 'n/a'}",
+        f"Risk: {alert.risk.score:.0f}/100 ({_safe(alert.risk.level.value)})   "
+        f"Severity: {_safe(alert.severity.value)}",
+        f"Source IP: {_safe(alert.ip or 'n/a')}   User: {_safe(alert.user or 'n/a')}   "
+        f"Host: {_safe(alert.hostname or 'n/a')}",
         f"Events: {alert.event_count}   "
         f"Window: {alert.first_seen:%Y-%m-%d %H:%M} - {alert.last_seen:%H:%M} UTC",
     ]
     if alert.mitre_techniques:
         lines.append(
-            f"MITRE ATT&CK: {', '.join(alert.mitre_techniques)} "
-            f"({', '.join(alert.mitre_tactics)})"
+            f"MITRE ATT&CK: {_safe(', '.join(alert.mitre_techniques))} "
+            f"({_safe(', '.join(alert.mitre_tactics))})"
         )
     if alert.risk.factors:
         lines.append("\n[bold]Why this score:[/bold]")
         lines.extend(
-            f"  {f.points:+.0f}  {f.reason}" for f in alert.risk.factors
+            f"  {f.points:+.0f}  {_safe(f.reason)}" for f in alert.risk.factors
         )
     if alert.intel and alert.intel.sources:
         verdict = "[red]MALICIOUS[/red]" if alert.intel.malicious else "[green]clean[/green]"
         lines.append(
             f"\n[bold]Threat intel:[/bold] {verdict} "
             f"(score {alert.intel.score:.0f}/100 from "
-            f"{', '.join(sorted(alert.intel.sources))})"
+            f"{_safe(', '.join(sorted(alert.intel.sources)))})"
         )
     if alert.ai and alert.ai.explanation:
         lines.append(
             f"\n[bold]AI explanation[/bold] "
-            f"([italic]{alert.ai.explanation_source}[/italic]):\n{alert.ai.explanation}"
+            f"([italic]{_safe(alert.ai.explanation_source)}[/italic]):\n{_safe(alert.ai.explanation)}"
+        )
+    triage = alert.ai.triage if alert.ai else None
+    if triage:
+        confidence = float(triage.get("confidence", 0.0) or 0.0) * 100
+        origin = "model" if triage.get("valid_llm") else "template fallback"
+        lines.append(
+            f"\n[bold]Triage verdict (advisory):[/bold] "
+            f"{_safe(triage.get('verdict', '?'))} "
+            f"({confidence:.0f}% confidence, {origin}). "
+            "[dim]It does not change the risk score or trigger any response.[/dim]"
         )
     if alert.recommendation:
-        lines.append(f"\n[bold]Recommendation:[/bold] {alert.recommendation}")
+        lines.append(f"\n[bold]Recommendation:[/bold] {_safe(alert.recommendation)}")
     return "\n".join(lines)

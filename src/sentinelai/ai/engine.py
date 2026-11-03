@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sentinelai.ai import isolation_forest  # noqa: F401 - registers the default model
 from sentinelai.ai.base import create_model
@@ -10,8 +11,10 @@ from sentinelai.ai.behavior import BehaviorAnalyzer
 from sentinelai.ai.explain import AlertExplainer
 from sentinelai.ai.features import FeatureExtractor
 from sentinelai.ai.patterns import AttackPattern, AttackPatternRecognizer
+from sentinelai.ai.triage_cache import TriageCache
+from sentinelai.ai.triage_engine import TriageEngine
 from sentinelai.config.models import AIConfig
-from sentinelai.core.exceptions import AIError
+from sentinelai.core.exceptions import AIError, StorageError
 from sentinelai.core.models import (
     AIInsight,
     Alert,
@@ -30,12 +33,29 @@ ANOMALY_RULE_ID = "AI001"
 class AIEngine:
     """Coordinates all AI capabilities behind one small interface."""
 
-    def __init__(self, config: AIConfig) -> None:
+    def __init__(self, config: AIConfig, *, state_dir: Path | None = None) -> None:
         self._config = config
         self._extractor = FeatureExtractor()
         self._behavior = BehaviorAnalyzer()
         self._patterns = AttackPatternRecognizer()
-        self._explainer = AlertExplainer(config.llm)
+        self._triage_cache: TriageCache | None = None
+        triage: TriageEngine | None = None
+        llm = config.llm
+        if state_dir is not None and llm.enabled and llm.cache_ttl_seconds > 0:
+            try:
+                self._triage_cache = TriageCache(
+                    state_dir / "triage_cache.db", llm.cache_ttl_seconds
+                )
+            except StorageError as exc:
+                _LOGGER.warning("Triage cache disabled: %s", exc)
+            else:
+                try:
+                    self._triage_cache.purge_expired()
+                except StorageError as exc:
+                    _LOGGER.warning("Triage cache purge failed: %s", exc)
+                triage = TriageEngine(llm, cache=self._triage_cache)
+        self._triage = triage
+        self._explainer = AlertExplainer(llm, triage)
         self._available = config.enabled
         if self._available:
             try:
@@ -145,10 +165,32 @@ class AIEngine:
 
     def explain(self, alert: Alert) -> AIInsight:
         """Attach (and return) a natural-language explanation for *alert*."""
-        explanation, source, confidence = self._explainer.explain(alert)
+        explanation, source, confidence, outcome = self._explainer.explain_full(alert)
         if alert.ai is None:
             alert.ai = AIInsight(model=self._config.model)
         alert.ai.explanation = explanation
         alert.ai.explanation_source = source
         alert.ai.confidence = confidence
+        if outcome is not None:
+            alert.ai.triage = {
+                **outcome.result.to_dict(),
+                "source": outcome.source,
+                "language": outcome.language,
+                "valid_llm": outcome.valid_llm,
+                "cached": outcome.cached,
+                "rejection": outcome.rejection,
+            }
         return alert.ai
+
+    def close(self) -> None:
+        """Release the triage engine and cache (safe to call repeatedly)."""
+        self._explainer.close()
+        triage, self._triage = self._triage, None
+        if triage is not None:
+            triage.close()
+        cache, self._triage_cache = self._triage_cache, None
+        if cache is not None:
+            try:
+                cache.close()
+            except StorageError as exc:
+                _LOGGER.warning("Triage cache close failed: %s", exc)
