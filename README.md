@@ -410,15 +410,17 @@ The scenarios are synthetic and were written against the current behavior of
 the rules. 100% recall and 0 false positives on this benchmark therefore means
 "no regression", not real-world accuracy.
 
-### Known detection gaps surfaced while building the benchmark
+### Known detection gaps
 
-- R051 also flags plain `ufw allow` commands.
-- R060 fires on any Docker log line containing the word "privileged", even
-  `privileged: false`.
+Found while building the benchmark and still open:
+
 - R041/R042 cannot tell a legitimate `authorized_keys` edit from an attack
   because they match on the text.
 - R031 and R050 score only "medium" risk.
-- `pam_faillock` lines logged by sshd are not classified as `ACCOUNT_LOCKED`.
+
+Fixed using the benchmark: R051 no longer flags plain `ufw allow`, R060 no
+longer fires on `privileged: false`, and `pam_faillock` lines logged by sshd
+are now classified as `ACCOUNT_LOCKED`.
 
 ---
 

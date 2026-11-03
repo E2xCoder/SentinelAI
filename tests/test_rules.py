@@ -305,6 +305,20 @@ class TestFirewallModification:
         assert alert is not None
         assert alert.rule_id == "R051"
 
+    def test_ufw_allow_does_not_fire_but_disable_does(self, rule_ctx) -> None:
+        benign = make_event(
+            event_type=EventType.SUDO_COMMAND, user="opsuser",
+            command="/usr/sbin/ufw allow 443/tcp",
+        )
+        assert FirewallModificationRule().evaluate(benign, rule_ctx) is None
+        tamper = make_event(
+            event_type=EventType.SUDO_COMMAND, user="opsuser",
+            command="/usr/sbin/ufw disable",
+        )
+        alert = FirewallModificationRule().evaluate(tamper, rule_ctx)
+        assert alert is not None
+        assert alert.rule_id == "R051"
+
 
 class TestSuspiciousDocker:
     def test_privileged_container(self, rule_ctx) -> None:
@@ -313,5 +327,21 @@ class TestSuspiciousDocker:
             service="docker", message="starting privileged container", privileged=True,
         )
         alert = SuspiciousDockerRule().evaluate(event, rule_ctx)
+        assert alert is not None
+        assert alert.rule_id == "R060"
+
+    def test_privileged_false_message_does_not_fire_but_real_privileged_does(
+        self, rule_ctx
+    ) -> None:
+        benign = make_event(
+            event_type=EventType.CONTAINER_EVENT, category=EventCategory.DOCKER,
+            service="docker", message="Container started container=3f2a1b9c8d7e privileged: false",
+        )
+        assert SuspiciousDockerRule().evaluate(benign, rule_ctx) is None
+        real = make_event(
+            event_type=EventType.CONTAINER_EVENT, category=EventCategory.DOCKER,
+            service="docker", message="starting privileged container", privileged=True,
+        )
+        alert = SuspiciousDockerRule().evaluate(real, rule_ctx)
         assert alert is not None
         assert alert.rule_id == "R060"

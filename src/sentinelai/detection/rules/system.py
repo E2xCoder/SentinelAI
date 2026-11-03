@@ -16,7 +16,7 @@ _CRITICAL_UNITS = (
 _FIREWALL_TAMPER = re.compile(
     r"""
     (?:
-        ufw\s+(?:disable|delete|reset|allow)
+        ufw\s+(?:disable|delete|reset)
         | iptables\s+(?:-F|--flush|-X|-D|--delete|-P\s+\w+\s+ACCEPT)
         | nft\s+(?:flush|delete)
         | systemctl\s+(?:stop|disable|mask)\s+(?:ufw|firewalld|fail2ban|nftables|iptables)

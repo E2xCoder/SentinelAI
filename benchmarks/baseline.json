@@ -168,16 +168,16 @@
   },
   "risk": {
     "attack": {
-      "alerts": 27,
+      "alerts": 28,
       "by_level": {
         "critical": 0,
         "high": 1,
         "informational": 2,
-        "low": 7,
+        "low": 8,
         "medium": 17
       },
       "max": 65.0,
-      "mean": 41.95,
+      "mean": 41.7,
       "min": 12.0
     },
     "benign": {
@@ -304,13 +304,13 @@
       "tp": 1
     },
     "R022": {
-      "attack_scenarios": 1,
+      "attack_scenarios": 2,
       "fn": 0,
       "fp": 0,
       "name": "Account Locked",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 1
+      "tp": 2
     },
     "R030": {
       "attack_scenarios": 1,
@@ -921,6 +921,28 @@
       "unexpected_rules": []
     },
     {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R022"
+        }
+      ],
+      "events": 4,
+      "expected_rules": [
+        "R022"
+      ],
+      "fired_rules": [
+        "R022"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r022_pam_faillock_lock",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
       "alerts": [],
       "events": 8,
       "expected_rules": [],
@@ -1199,6 +1221,18 @@
       "fired_rules": [],
       "kind": "benign",
       "missing_rules": [],
+      "name": "r051_benign_ufw_allow",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
       "name": "r051_benign_ufw_status",
       "passed": true,
       "risk_ok": true,
@@ -1239,6 +1273,18 @@
       "unexpected_rules": []
     },
     {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r060_benign_privileged_false",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
       "alerts": [
         {
           "risk_level": "medium",
@@ -1265,14 +1311,14 @@
   "sentinelai_version": "0.1.0",
   "summary": {
     "attack_recall": 1.0,
-    "attack_scenarios": 26,
+    "attack_scenarios": 27,
     "benign_alerts": 0,
-    "benign_events": 202,
-    "benign_scenarios": 24,
+    "benign_events": 210,
+    "benign_scenarios": 26,
     "fp_per_1k_benign_events": 0.0,
     "precision": 1.0,
-    "scenarios_passed": 50,
-    "scenarios_total": 50,
+    "scenarios_passed": 53,
+    "scenarios_total": 53,
     "uncovered_rules": []
   }
 }

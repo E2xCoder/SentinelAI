@@ -1,0 +1,4 @@
+name: r060_benign_privileged_false
+kind: benign
+description: Ordinary container starts whose messages state that privileged mode is false.
+files: [docker.log]

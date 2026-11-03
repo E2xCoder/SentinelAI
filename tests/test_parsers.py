@@ -98,6 +98,16 @@ class TestSyslogParser:
         assert event is not None
         assert event.event_type is EventType.SERVICE_STOPPED
 
+    def test_sshd_pam_faillock_lock_is_account_locked(self) -> None:
+        line = (
+            "2026-01-07T12:00:05+00:00 web01 sshd[2301]: pam_faillock(sshd:auth): "
+            "Consecutive login failures for user bob account temporarily locked"
+        )
+        event = SyslogParser().parse_line(line)
+        assert event is not None
+        assert event.event_type is EventType.ACCOUNT_LOCKED
+        assert event.user == "bob"
+
     @pytest.mark.parametrize("line", MALFORMED_LINES)
     def test_malformed(self, line: str) -> None:
         assert SyslogParser().parse_line(line) is None

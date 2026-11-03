@@ -1,0 +1,4 @@
+2026-01-07T12:00:01+00:00 web01 sshd[2301]: Failed password for bob from 203.0.113.9 port 50001 ssh2
+2026-01-07T12:00:02+00:00 web01 sshd[2301]: Failed password for bob from 203.0.113.9 port 50002 ssh2
+2026-01-07T12:00:03+00:00 web01 sshd[2301]: Failed password for bob from 203.0.113.9 port 50003 ssh2
+2026-01-07T12:00:05+00:00 web01 sshd[2301]: pam_faillock(sshd:auth): Consecutive login failures for user bob account temporarily locked

@@ -30,7 +30,7 @@ _LEVEL_SEVERITY = {
 }
 
 _CONTAINER_ID = re.compile(r"container(?:=|\s+)(?P<cid>[0-9a-f]{12,64})")
-_PRIVILEGED = re.compile(r"privileged", re.IGNORECASE)
+_PRIVILEGED = re.compile(r"privileged(?!\s*[:=]?\s*(?:false|no|0|off)\b)", re.IGNORECASE)
 
 
 @register_parser

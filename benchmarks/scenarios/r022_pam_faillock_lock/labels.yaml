@@ -1,0 +1,6 @@
+name: r022_pam_faillock_lock
+kind: attack
+description: pam_faillock locks an account after repeated failed SSH passwords.
+files: [auth.log]
+expect:
+  rules: [R022]

@@ -1,0 +1,4 @@
+name: r051_benign_ufw_allow
+kind: benign
+description: Routine ufw allow rules for HTTPS and a trusted subnet, followed by a status check.
+files: [auth.log]

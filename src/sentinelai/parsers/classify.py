@@ -285,6 +285,10 @@ _SERVICE_TABLES: list[tuple[Pattern[str], list[tuple[Pattern[str], Builder]], Ev
 # service table has no match.
 _GENERIC_PATTERNS: list[tuple[Pattern[str], Builder]] = [
     (
+        re.compile(rf"pam_faillock.*[Cc]onsecutive login failures for user {_USER}"),
+        _c(EventType.ACCOUNT_LOCKED, EventCategory.AUTHENTICATION, Severity.WARNING),
+    ),
+    (
         re.compile(rf"authentication failure;.*rhost={_IP}(?:\s+user={_USER})?"),
         _c(EventType.AUTH_FAILURE, EventCategory.AUTHENTICATION, Severity.WARNING),
     ),

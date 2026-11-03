@@ -10,7 +10,7 @@ from sentinelai.detection.base import Rule, RuleContext, register_rule
 _SENSITIVE = re.compile(
     r"""
     (?:
-        privileged
+        privileged(?!\s*[:=]?\s*(?:false|no|0|off)\b)
         | docker\.sock
         | pid(?:=|\s+)host | pid_mode.*host
         | net(?:work)?(?:=|\s+|_mode.*)host
