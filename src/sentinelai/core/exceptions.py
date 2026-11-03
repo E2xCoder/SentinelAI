@@ -60,3 +60,9 @@ class PluginError(SentinelError):
     """Raised when a plugin cannot be loaded."""
 
     exit_code = 9
+
+
+class EvaluationError(SentinelError):
+    """Raised when a benchmark, baseline or manifest is missing or invalid."""
+
+    exit_code = 10

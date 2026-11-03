@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import NoReturn
 
 import click
+from rich.markup import escape
 
 from sentinelai.cli import console as ui
 from sentinelai.config.models import SentinelConfig
@@ -37,5 +38,5 @@ def build_pipeline(config: SentinelConfig) -> AnalysisPipeline:
 
 def fail(exc: SentinelError) -> NoReturn:
     """Print a clean error and exit with the exception's code."""
-    ui.error_console.print(f"[red]Error:[/red] {exc}")
+    ui.error_console.print(f"[red]Error:[/red] {escape(str(exc))}")
     raise SystemExit(exc.exit_code)

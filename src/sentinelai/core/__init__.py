@@ -3,6 +3,7 @@
 from sentinelai.core.exceptions import (
     AIError,
     ConfigError,
+    EvaluationError,
     FirewallError,
     LogSourceError,
     ParserError,
@@ -29,6 +30,7 @@ __all__ = [
     "AIInsight",
     "Alert",
     "ConfigError",
+    "EvaluationError",
     "EventCategory",
     "EventType",
     "FirewallError",

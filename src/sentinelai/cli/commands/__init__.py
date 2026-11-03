@@ -2,11 +2,13 @@
 
 ``analysis`` holds the commands that run the pipeline (scan, analyze,
 replay, live); ``inspection`` holds the read-only commands (explain,
-report, search, rules, config, version). ``app.py`` registers them on
+report, search, rules, config, version); ``evaluation`` holds the offline
+benchmark command (eval). ``app.py`` registers them on
 the root group, so adding a command is a local change here.
 """
 
 from sentinelai.cli.commands.analysis import analyze, live, replay, scan
+from sentinelai.cli.commands.evaluation import eval_cmd
 from sentinelai.cli.commands.inspection import (
     config_cmd,
     explain,
@@ -28,6 +30,7 @@ ALL_COMMANDS = [
     rules_cmd,
     config_cmd,
     version_cmd,
+    eval_cmd,
 ]
 
 __all__ = ["ALL_COMMANDS"]
