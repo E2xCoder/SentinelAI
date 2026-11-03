@@ -48,9 +48,20 @@ def parse_syslog_timestamp(value: str, reference_year: int | None = None) -> dat
     return result
 
 
+_FRACTION = re.compile(r"\.(\d+)")
+
+
 def parse_iso_timestamp(value: str) -> datetime | None:
-    """Parse an ISO-8601 timestamp, tolerating a trailing ``Z``."""
-    candidate = value.strip().replace("Z", "+00:00")
+    """Parse an ISO-8601 timestamp, tolerating a trailing ``Z``.
+
+    The fractional part is normalized to microseconds first: Docker emits
+    nanoseconds, which ``datetime.fromisoformat`` rejects before Python 3.11.
+    """
+    candidate = _FRACTION.sub(
+        lambda m: "." + m.group(1)[:6].ljust(6, "0"),
+        value.strip().replace("Z", "+00:00"),
+        count=1,
+    )
     try:
         parsed = datetime.fromisoformat(candidate)
     except ValueError:
