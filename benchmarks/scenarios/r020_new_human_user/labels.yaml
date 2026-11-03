@@ -1,0 +1,8 @@
+name: r020_new_human_user
+kind: attack
+description: A new interactive human account is created outside any change window.
+files: [auth.log]
+expect:
+  rules: [R020]
+forbid:
+  rules: [R012, R021]

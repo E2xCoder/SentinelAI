@@ -1,0 +1,4 @@
+name: r004_benign_sparse_failures
+kind: benign
+description: Twelve failures for a service account spread two minutes apart, never ten within 15 minutes.
+files: [auth.log]

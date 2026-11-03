@@ -1,0 +1,12 @@
+2026-01-07T17:00:00+00:00 web01 sshd[1061]: Failed password for deploy from 203.0.113.60 port 48000 ssh2
+2026-01-07T17:00:01+00:00 web01 sshd[1062]: Accepted password for deploy from 203.0.113.60 port 48002 ssh2
+2026-01-07T17:00:02+00:00 web01 sshd[1063]: Accepted password for deploy from 203.0.113.60 port 48004 ssh2
+2026-01-07T17:00:03+00:00 web01 sshd[1064]: Accepted password for deploy from 203.0.113.60 port 48006 ssh2
+2026-01-07T17:00:04+00:00 web01 sshd[1065]: Failed password for deploy from 203.0.113.60 port 48008 ssh2
+2026-01-07T17:00:05+00:00 web01 sshd[1066]: Accepted password for deploy from 203.0.113.60 port 48010 ssh2
+2026-01-07T17:00:06+00:00 web01 sshd[1067]: Accepted password for deploy from 203.0.113.60 port 48012 ssh2
+2026-01-07T17:00:07+00:00 web01 sshd[1068]: Accepted password for deploy from 203.0.113.60 port 48014 ssh2
+2026-01-07T17:00:08+00:00 web01 sshd[1069]: Failed password for deploy from 203.0.113.60 port 48016 ssh2
+2026-01-07T17:00:09+00:00 web01 sshd[1070]: Accepted password for deploy from 203.0.113.60 port 48018 ssh2
+2026-01-07T17:00:10+00:00 web01 sshd[1071]: Accepted password for deploy from 203.0.113.60 port 48020 ssh2
+2026-01-07T17:00:11+00:00 web01 sshd[1072]: Accepted password for deploy from 203.0.113.60 port 48022 ssh2

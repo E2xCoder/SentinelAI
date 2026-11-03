@@ -1,0 +1,9 @@
+name: r040_cron_download_pipe_shell
+kind: attack
+description: A cron job downloads a script and pipes it straight into a shell.
+files: [auth.log]
+expect:
+  rules: [R040]
+  min_risk_level: medium
+forbid:
+  rules: [R041, R042]

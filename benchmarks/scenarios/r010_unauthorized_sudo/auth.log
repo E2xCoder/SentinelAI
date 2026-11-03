@@ -1,0 +1,2 @@
+2026-01-07T10:02:11+00:00 web01 sudo[4101]: dave : user NOT in sudoers ; TTY=pts/1 ; PWD=/home/dave ; USER=root ; COMMAND=/bin/cat /etc/shadow
+2026-01-07T10:02:40+00:00 web01 sudo[4102]: dave : user NOT in sudoers ; TTY=pts/1 ; PWD=/home/dave ; USER=root ; COMMAND=/usr/bin/id

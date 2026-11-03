@@ -1,0 +1,4 @@
+name: r041_benign_sshd_config_review
+kind: benign
+description: An admin reviews sshd configuration and service state, without touching key material.
+files: [auth.log]

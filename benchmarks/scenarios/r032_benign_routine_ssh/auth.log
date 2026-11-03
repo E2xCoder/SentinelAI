@@ -1,0 +1,5 @@
+2026-01-07T12:00:05+00:00 web01 sshd[2201]: Accepted publickey for opsuser from 192.0.2.51 port 52201 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:05:20+00:00 web01 sshd[2202]: Accepted publickey for opsuser from 192.0.2.51 port 52202 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:10:40+00:00 db01 sshd[2203]: Accepted publickey for opsuser from 192.0.2.51 port 52203 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:20:00+00:00 web01 sshd[2204]: Accepted publickey for opsuser from 192.0.2.51 port 52204 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:30:00+00:00 db01 sshd[2205]: Accepted publickey for opsuser from 192.0.2.51 port 52205 ssh2: RSA SHA256:AAAAfakefingerprint

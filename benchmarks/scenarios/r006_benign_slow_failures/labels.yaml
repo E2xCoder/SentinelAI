@@ -1,0 +1,4 @@
+name: r006_benign_slow_failures
+kind: benign
+description: Six failed logins spread two minutes apart from one address.
+files: [auth.log]

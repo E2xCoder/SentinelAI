@@ -1,0 +1,8 @@
+name: r011_repeated_sudo_failures
+kind: attack
+description: Three wrong sudo passwords by the same user within two minutes.
+files: [auth.log]
+expect:
+  rules: [R011]
+forbid:
+  rules: [R010]

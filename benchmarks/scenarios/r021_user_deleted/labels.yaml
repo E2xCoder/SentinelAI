@@ -1,0 +1,8 @@
+name: r021_user_deleted
+kind: attack
+description: An account is deleted shortly after hours, a possible evidence-destruction step.
+files: [auth.log]
+expect:
+  rules: [R021]
+forbid:
+  rules: [R020]

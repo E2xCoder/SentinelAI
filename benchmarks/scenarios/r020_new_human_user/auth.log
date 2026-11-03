@@ -1,0 +1,2 @@
+2026-01-07T03:12:20+00:00 web01 useradd[7101]: new group: name=mallory, GID=1001
+2026-01-07T03:12:20+00:00 web01 useradd[7101]: new user: name=mallory, UID=1001, GID=1001, home=/home/mallory, shell=/bin/bash

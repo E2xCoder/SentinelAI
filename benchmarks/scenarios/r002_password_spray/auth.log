@@ -1,0 +1,4 @@
+2026-01-07T13:00:00+00:00 web01 sshd[1011]: Failed password for invalid user oracle from 198.51.100.7 port 41000 ssh2
+2026-01-07T13:00:20+00:00 web01 sshd[1012]: Failed password for invalid user postgres from 198.51.100.7 port 41002 ssh2
+2026-01-07T13:00:40+00:00 web01 sshd[1013]: Failed password for invalid user git from 198.51.100.7 port 41004 ssh2
+2026-01-07T13:01:00+00:00 web01 sshd[1014]: Failed password for invalid user tomcat from 198.51.100.7 port 41006 ssh2

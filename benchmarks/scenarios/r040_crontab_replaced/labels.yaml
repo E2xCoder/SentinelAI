@@ -1,0 +1,6 @@
+name: r040_crontab_replaced
+kind: attack
+description: A user replaces their crontab, which R040 flags as modification.
+files: [auth.log]
+expect:
+  rules: [R040]

@@ -1,0 +1,1278 @@
+{
+  "ai_used": true,
+  "mitre": {
+    "covered": 26,
+    "techniques": {
+      "T1021.004": {
+        "detected": true,
+        "rules": [
+          "R032"
+        ]
+      },
+      "T1046": {
+        "detected": true,
+        "rules": [
+          "R030"
+        ]
+      },
+      "T1053.003": {
+        "detected": true,
+        "rules": [
+          "R040"
+        ]
+      },
+      "T1059.004": {
+        "detected": true,
+        "rules": [
+          "R031"
+        ]
+      },
+      "T1071": {
+        "detected": true,
+        "rules": [
+          "R031"
+        ]
+      },
+      "T1078": {
+        "detected": true,
+        "rules": [
+          "R007"
+        ]
+      },
+      "T1078.003": {
+        "detected": true,
+        "rules": [
+          "R005"
+        ]
+      },
+      "T1098": {
+        "detected": true,
+        "rules": [
+          "R012"
+        ]
+      },
+      "T1098.004": {
+        "detected": true,
+        "rules": [
+          "R041"
+        ]
+      },
+      "T1110": {
+        "detected": true,
+        "rules": [
+          "R004",
+          "R006",
+          "R022"
+        ]
+      },
+      "T1110.001": {
+        "detected": true,
+        "rules": [
+          "R001"
+        ]
+      },
+      "T1110.003": {
+        "detected": true,
+        "rules": [
+          "R002"
+        ]
+      },
+      "T1110.004": {
+        "detected": true,
+        "rules": [
+          "R003"
+        ]
+      },
+      "T1136.001": {
+        "detected": true,
+        "rules": [
+          "R020"
+        ]
+      },
+      "T1489": {
+        "detected": true,
+        "rules": [
+          "R050"
+        ]
+      },
+      "T1531": {
+        "detected": true,
+        "rules": [
+          "R021",
+          "R022"
+        ]
+      },
+      "T1543.002": {
+        "detected": true,
+        "rules": [
+          "R042"
+        ]
+      },
+      "T1546.004": {
+        "detected": true,
+        "rules": [
+          "R042"
+        ]
+      },
+      "T1548": {
+        "detected": true,
+        "rules": [
+          "R012"
+        ]
+      },
+      "T1548.003": {
+        "detected": true,
+        "rules": [
+          "R010",
+          "R011"
+        ]
+      },
+      "T1552.004": {
+        "detected": true,
+        "rules": [
+          "R041"
+        ]
+      },
+      "T1562.001": {
+        "detected": true,
+        "rules": [
+          "R050"
+        ]
+      },
+      "T1562.004": {
+        "detected": true,
+        "rules": [
+          "R051"
+        ]
+      },
+      "T1595.001": {
+        "detected": true,
+        "rules": [
+          "R030"
+        ]
+      },
+      "T1610": {
+        "detected": true,
+        "rules": [
+          "R060"
+        ]
+      },
+      "T1611": {
+        "detected": true,
+        "rules": [
+          "R060"
+        ]
+      }
+    },
+    "total": 26
+  },
+  "risk": {
+    "attack": {
+      "alerts": 27,
+      "by_level": {
+        "critical": 0,
+        "high": 1,
+        "informational": 2,
+        "low": 7,
+        "medium": 17
+      },
+      "max": 65.0,
+      "mean": 41.95,
+      "min": 12.0
+    },
+    "benign": {
+      "alerts": 0,
+      "by_level": {
+        "critical": 0,
+        "high": 0,
+        "informational": 0,
+        "low": 0,
+        "medium": 0
+      },
+      "max": null,
+      "mean": null,
+      "min": null
+    }
+  },
+  "rules": {
+    "R001": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "SSH Brute Force",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R002": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Password Spraying",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R003": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Credential Stuffing",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R004": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Repeated Authentication Failures",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R005": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Root Login",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R006": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Impossible Login Frequency",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R007": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Login Hours",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R010": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Unauthorized Sudo Attempt",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R011": {
+      "attack_scenarios": 2,
+      "fn": 0,
+      "fp": 0,
+      "name": "Sudo Abuse",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 2
+    },
+    "R012": {
+      "attack_scenarios": 2,
+      "fn": 0,
+      "fp": 0,
+      "name": "Privilege Escalation",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 2
+    },
+    "R020": {
+      "attack_scenarios": 2,
+      "fn": 0,
+      "fp": 0,
+      "name": "New User Created",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 2
+    },
+    "R021": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "User Account Deleted",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R022": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Account Locked",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R030": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Port Scan",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R031": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Reverse Shell Indicator",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R032": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Lateral Movement",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R040": {
+      "attack_scenarios": 2,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Cron Activity",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 2
+    },
+    "R041": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "SSH Key Manipulation",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R042": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Persistence Indicator",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R050": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Service Stopped Unexpectedly",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R051": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Firewall Modification",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "R060": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Docker Activity",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    }
+  },
+  "scenarios": [
+    {
+      "alerts": [],
+      "events": 39,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "benign_normal_admin_day",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 40,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "benign_web_noise",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 4,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r001_benign_typos",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 50.44,
+          "rule_id": "R001"
+        }
+      ],
+      "events": 6,
+      "expected_rules": [
+        "R001"
+      ],
+      "fired_rules": [
+        "R001"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r001_ssh_bruteforce",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r002_benign_few_accounts",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 48.0,
+          "rule_id": "R002"
+        }
+      ],
+      "events": 4,
+      "expected_rules": [
+        "R002"
+      ],
+      "fired_rules": [
+        "R002"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r002_password_spray",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 8,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r003_benign_two_sources",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 51.31,
+          "rule_id": "R003"
+        }
+      ],
+      "events": 8,
+      "expected_rules": [
+        "R003"
+      ],
+      "fired_rules": [
+        "R003"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r003_credential_stuffing",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 12,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r004_benign_sparse_failures",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 37.65,
+          "rule_id": "R004"
+        }
+      ],
+      "events": 10,
+      "expected_rules": [
+        "R004"
+      ],
+      "fired_rules": [
+        "R004"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r004_repeated_failures",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 2,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r005_benign_admin_session",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R005"
+        }
+      ],
+      "events": 1,
+      "expected_rules": [
+        "R005"
+      ],
+      "fired_rules": [
+        "R005"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r005_root_login",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 6,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r006_benign_slow_failures",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 59.32,
+          "rule_id": "R006"
+        }
+      ],
+      "events": 12,
+      "expected_rules": [
+        "R006"
+      ],
+      "fired_rules": [
+        "R006"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r006_machine_speed",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 1,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r007_benign_daytime_login",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "informational",
+          "risk_score": 12.0,
+          "rule_id": "R007"
+        }
+      ],
+      "events": 1,
+      "expected_rules": [
+        "R007"
+      ],
+      "fired_rules": [
+        "R007"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r007_off_hours_login",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 6,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r010_benign_admin_apt_update",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 50.0,
+          "rule_id": "R010"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R010"
+      ],
+      "fired_rules": [
+        "R010"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r010_unauthorized_sudo",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r011_benign_typo_then_success",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 56.93,
+          "rule_id": "R011"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R011"
+      ],
+      "fired_rules": [
+        "R011"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r011_repeated_sudo_failures",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R011"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R011"
+      ],
+      "fired_rules": [
+        "R011"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r011_sudo_root_shell",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r012_benign_project_group_and_su_user",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R012"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R012"
+      ],
+      "fired_rules": [
+        "R012"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r012_su_to_root",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 50.0,
+          "rule_id": "R012"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R012"
+      ],
+      "fired_rules": [
+        "R012"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r012_user_added_to_sudo_group",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 7,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r020_benign_service_accounts",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 22.0,
+          "rule_id": "R020"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R020"
+      ],
+      "fired_rules": [
+        "R020"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r020_new_human_user",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "high",
+          "risk_score": 65.0,
+          "rule_id": "R020"
+        }
+      ],
+      "events": 1,
+      "expected_rules": [
+        "R020"
+      ],
+      "fired_rules": [
+        "R020"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r020_uid0_backdoor_account",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r021_benign_routine_account_admin",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R021"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R021"
+      ],
+      "fired_rules": [
+        "R021"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r021_user_deleted",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R022"
+        },
+        {
+          "risk_level": "low",
+          "risk_score": 35.0,
+          "rule_id": "R022"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R022"
+      ],
+      "fired_rules": [
+        "R022"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r022_account_locked",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 8,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r030_benign_few_ports",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 12,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r030_benign_slow_probe",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.98,
+          "rule_id": "R030"
+        }
+      ],
+      "events": 14,
+      "expected_rules": [
+        "R030"
+      ],
+      "fired_rules": [
+        "R030"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r030_port_scan",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 4,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r031_benign_netcheck",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 55.0,
+          "rule_id": "R031"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R031"
+      ],
+      "fired_rules": [
+        "R031"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r031_reverse_shell",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 5,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r032_benign_routine_ssh",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 46.93,
+          "rule_id": "R032"
+        }
+      ],
+      "events": 4,
+      "expected_rules": [
+        "R032"
+      ],
+      "fired_rules": [
+        "R032"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r032_lateral_movement",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 7,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r040_benign_backup_cron",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R040"
+        }
+      ],
+      "events": 1,
+      "expected_rules": [
+        "R040"
+      ],
+      "fired_rules": [
+        "R040"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r040_cron_download_pipe_shell",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "informational",
+          "risk_score": 12.0,
+          "rule_id": "R040"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R040"
+      ],
+      "fired_rules": [
+        "R040"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r040_crontab_replaced",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R041"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R041"
+      ],
+      "fired_rules": [
+        "R041"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r041_authorized_keys_planted",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r041_benign_sshd_config_review",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r042_benign_service_restart",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R042"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R042"
+      ],
+      "fired_rules": [
+        "R042"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r042_systemd_unit_persistence",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 4,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r050_benign_service_restart",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 52.0,
+          "rule_id": "R050"
+        }
+      ],
+      "events": 4,
+      "expected_rules": [
+        "R050"
+      ],
+      "fired_rules": [
+        "R050"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r050_security_service_stopped",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r051_benign_ufw_status",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 48.0,
+          "rule_id": "R051"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "R051"
+      ],
+      "fired_rules": [
+        "R051"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r051_firewall_disabled",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 8,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "r060_benign_daemon_restart",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R060"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "R060"
+      ],
+      "fired_rules": [
+        "R060"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "r060_privileged_container",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    }
+  ],
+  "schema_version": 1,
+  "sentinelai_version": "0.1.0",
+  "summary": {
+    "attack_recall": 1.0,
+    "attack_scenarios": 26,
+    "benign_alerts": 0,
+    "benign_events": 202,
+    "benign_scenarios": 24,
+    "fp_per_1k_benign_events": 0.0,
+    "precision": 1.0,
+    "scenarios_passed": 50,
+    "scenarios_total": 50,
+    "uncovered_rules": []
+  }
+}

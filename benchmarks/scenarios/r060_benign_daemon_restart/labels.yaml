@@ -1,0 +1,4 @@
+name: r060_benign_daemon_restart
+kind: benign
+description: Docker daemon restarts and normal unprivileged container starts.
+files: [docker.log]

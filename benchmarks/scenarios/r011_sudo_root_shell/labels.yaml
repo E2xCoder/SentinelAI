@@ -1,0 +1,8 @@
+name: r011_sudo_root_shell
+kind: attack
+description: A sudoer spawns an unrestricted root shell through sudo.
+files: [auth.log]
+expect:
+  rules: [R011]
+forbid:
+  rules: [R010, R012]

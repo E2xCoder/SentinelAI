@@ -1,0 +1,6 @@
+name: r060_privileged_container
+kind: attack
+description: Containers are started privileged, with the Docker socket mounted, and with host PID namespace.
+files: [docker.log]
+expect:
+  rules: [R060]

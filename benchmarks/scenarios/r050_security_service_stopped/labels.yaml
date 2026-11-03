@@ -1,0 +1,6 @@
+name: r050_security_service_stopped
+kind: attack
+description: The ufw and fail2ban services are stopped and auditd fails to start.
+files: [syslog.log]
+expect:
+  rules: [R050]

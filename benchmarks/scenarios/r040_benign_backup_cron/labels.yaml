@@ -1,0 +1,4 @@
+name: r040_benign_backup_cron
+kind: benign
+description: Routine scheduled backup and housekeeping cron jobs plus a crontab listing.
+files: [auth.log]

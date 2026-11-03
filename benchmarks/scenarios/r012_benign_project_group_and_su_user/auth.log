@@ -1,0 +1,5 @@
+2026-01-07T13:10:00+00:00 web01 usermod[6301]: add 'alice' to group 'developers'
+2026-01-07T13:10:00+00:00 web01 usermod[6301]: add 'alice' to shadow group 'developers'
+2026-01-07T13:25:31+00:00 web01 su[6310]: Successful su for deploy by alice
+2026-01-07T13:25:31+00:00 web01 su[6310]: pam_unix(su:session): session opened for user deploy(uid=1005) by alice(uid=1000)
+2026-01-07T13:32:08+00:00 web01 su[6310]: pam_unix(su:session): session closed for user deploy

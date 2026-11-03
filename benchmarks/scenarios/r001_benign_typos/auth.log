@@ -1,0 +1,4 @@
+2026-01-07T10:15:00+00:00 web01 sshd[1007]: Failed password for alice from 192.0.2.20 port 50100 ssh2
+2026-01-07T10:15:12+00:00 web01 sshd[1008]: Failed password for alice from 192.0.2.20 port 50102 ssh2
+2026-01-07T10:15:25+00:00 web01 sshd[1009]: Failed password for alice from 192.0.2.20 port 50104 ssh2
+2026-01-07T10:15:41+00:00 web01 sshd[1010]: Accepted password for alice from 192.0.2.20 port 50106 ssh2

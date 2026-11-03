@@ -1,0 +1,8 @@
+name: r041_authorized_keys_planted
+kind: attack
+description: An attacker appends their public key to root's authorized_keys through sudo.
+files: [auth.log]
+expect:
+  rules: [R041]
+forbid:
+  rules: [R010, R042]

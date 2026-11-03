@@ -1,0 +1,4 @@
+name: r030_benign_slow_probe
+kind: benign
+description: Twelve distinct ports are blocked but spread over 20+ minutes, outside the 60 second window.
+files: [ufw.log]

@@ -1,0 +1,2 @@
+2026-01-07T23:48:12+00:00 web01 userdel[8101]: delete user 'alice'
+2026-01-07T23:48:12+00:00 web01 userdel[8101]: removed group 'alice' owned by 'alice'

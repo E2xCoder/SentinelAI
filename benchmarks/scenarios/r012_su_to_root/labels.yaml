@@ -1,0 +1,8 @@
+name: r012_su_to_root
+kind: attack
+description: A regular user switches to root with su.
+files: [auth.log]
+expect:
+  rules: [R012]
+forbid:
+  rules: [R011]

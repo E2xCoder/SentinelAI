@@ -1,0 +1,9 @@
+name: r030_port_scan
+kind: attack
+description: One external host SYN-scans 14 distinct ports on the firewall within about 30 seconds.
+files: [ufw.log]
+expect:
+  rules: [R030]
+  min_risk_level: medium
+forbid:
+  rules: [R031]

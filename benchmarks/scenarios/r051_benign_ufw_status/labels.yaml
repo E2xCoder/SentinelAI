@@ -1,0 +1,4 @@
+name: r051_benign_ufw_status
+kind: benign
+description: Read-only ufw status, ufw enable and iptables -L listing commands.
+files: [auth.log]

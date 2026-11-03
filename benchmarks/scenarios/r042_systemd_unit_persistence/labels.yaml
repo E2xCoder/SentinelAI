@@ -1,0 +1,8 @@
+name: r042_systemd_unit_persistence
+kind: attack
+description: An attacker drops a systemd unit and enables it for persistence.
+files: [auth.log]
+expect:
+  rules: [R042]
+forbid:
+  rules: [R010]

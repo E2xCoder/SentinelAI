@@ -1,0 +1,39 @@
+2026-01-07T00:05:01+00:00 web01 CRON[3001]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+2026-01-07T00:05:01+00:00 web01 CRON[3001]: (root) CMD (/usr/local/bin/backup.sh)
+2026-01-07T00:05:03+00:00 web01 CRON[3001]: pam_unix(cron:session): session closed for user root
+2026-01-07T01:17:01+00:00 web01 CRON[3002]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+2026-01-07T01:17:01+00:00 web01 CRON[3002]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)
+2026-01-07T01:17:03+00:00 web01 CRON[3002]: pam_unix(cron:session): session closed for user root
+2026-01-07T02:17:01+00:00 web01 CRON[3003]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+2026-01-07T02:17:01+00:00 web01 CRON[3003]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)
+2026-01-07T02:17:03+00:00 web01 CRON[3003]: pam_unix(cron:session): session closed for user root
+2026-01-07T09:00:05+00:00 web01 sudo[3101]: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T09:00:05+00:00 web01 sudo[3101]: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)
+2026-01-07T09:00:19+00:00 web01 sudo[3101]: pam_unix(sudo:session): session closed for user root
+2026-01-07T09:10:20+00:00 web01 sudo[3102]: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/apt install -y htop
+2026-01-07T09:10:20+00:00 web01 sudo[3102]: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)
+2026-01-07T09:10:45+00:00 web01 sudo[3102]: pam_unix(sudo:session): session closed for user root
+2026-01-07T09:42:11+00:00 web01 sudo[3103]: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+2026-01-07T09:42:11+00:00 web01 sudo[3103]: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)
+2026-01-07T09:42:14+00:00 web01 sudo[3103]: pam_unix(sudo:session): session closed for user root
+2026-01-07T10:15:00+00:00 web01 sudo[3104]: bob : TTY=pts/0 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/tail -n 100 /var/log/syslog
+2026-01-07T10:15:00+00:00 web01 sudo[3104]: pam_unix(sudo:session): session opened for user root(uid=0) by bob(uid=1000)
+2026-01-07T10:15:40+00:00 web01 sudo[3104]: pam_unix(sudo:session): session closed for user root
+2026-01-07T10:55:30+00:00 web01 sudo[3105]: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/less /var/log/auth.log
+2026-01-07T10:55:30+00:00 web01 sudo[3105]: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)
+2026-01-07T10:57:30+00:00 web01 sudo[3105]: pam_unix(sudo:session): session closed for user root
+2026-01-07T11:30:02+00:00 web01 sudo[3106]: bob : TTY=pts/0 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/df -h
+2026-01-07T11:30:02+00:00 web01 sudo[3106]: pam_unix(sudo:session): session opened for user root(uid=0) by bob(uid=1000)
+2026-01-07T11:30:04+00:00 web01 sudo[3106]: pam_unix(sudo:session): session closed for user root
+2026-01-07T12:00:01+00:00 web01 CRON[3004]: pam_unix(cron:session): session opened for user alice(uid=0) by (uid=0)
+2026-01-07T12:00:01+00:00 web01 CRON[3004]: (alice) CMD (/usr/local/bin/backup.sh)
+2026-01-07T12:00:03+00:00 web01 CRON[3004]: pam_unix(cron:session): session closed for user alice
+2026-01-07T12:17:01+00:00 web01 CRON[3005]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+2026-01-07T12:17:01+00:00 web01 CRON[3005]: (root) CMD (   cd / && run-parts --report /etc/cron.hourly)
+2026-01-07T12:17:03+00:00 web01 CRON[3005]: pam_unix(cron:session): session closed for user root
+2026-01-07T14:05:44+00:00 web01 sudo[3107]: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/journalctl -u nginx --since today
+2026-01-07T14:05:44+00:00 web01 sudo[3107]: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)
+2026-01-07T14:06:14+00:00 web01 sudo[3107]: pam_unix(sudo:session): session closed for user root
+2026-01-07T18:00:01+00:00 web01 CRON[3006]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+2026-01-07T18:00:01+00:00 web01 CRON[3006]: (root) CMD (/usr/local/bin/backup.sh)
+2026-01-07T18:00:03+00:00 web01 CRON[3006]: pam_unix(cron:session): session closed for user root

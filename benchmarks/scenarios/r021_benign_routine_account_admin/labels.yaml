@@ -1,0 +1,4 @@
+name: r021_benign_routine_account_admin
+kind: benign
+description: Routine account housekeeping with no creation, deletion, lock or privileged group.
+files: [auth.log]

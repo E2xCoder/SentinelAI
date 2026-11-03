@@ -1,0 +1,4 @@
+name: r010_benign_admin_apt_update
+kind: benign
+description: An authorised admin runs routine apt maintenance through sudo.
+files: [auth.log]

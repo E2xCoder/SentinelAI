@@ -1,0 +1,8 @@
+name: r022_account_locked
+kind: attack
+description: An account is locked, as left behind by a brute-force run.
+files: [auth.log]
+expect:
+  rules: [R022]
+forbid:
+  rules: [R021]

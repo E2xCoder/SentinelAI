@@ -1,0 +1,7 @@
+name: r020_uid0_backdoor_account
+kind: attack
+description: A second UID 0 account is created, a root-equivalent backdoor.
+files: [auth.log]
+expect:
+  rules: [R020]
+  min_risk_level: high

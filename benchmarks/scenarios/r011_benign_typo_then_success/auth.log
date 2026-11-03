@@ -1,0 +1,5 @@
+2026-01-07T11:15:03+00:00 web01 sudo[5301]: bob : 1 incorrect password attempt ; TTY=pts/2 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/systemctl status nginx
+2026-01-07T11:15:12+00:00 web01 sudo[5302]: bob : 1 incorrect password attempt ; TTY=pts/2 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/systemctl status nginx
+2026-01-07T11:15:20+00:00 web01 sudo[5303]: bob : TTY=pts/2 ; PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/systemctl status nginx
+2026-01-07T11:15:20+00:00 web01 sudo[5303]: pam_unix(sudo:session): session opened for user root(uid=0) by bob(uid=1000)
+2026-01-07T11:15:21+00:00 web01 sudo[5303]: pam_unix(sudo:session): session closed for user root

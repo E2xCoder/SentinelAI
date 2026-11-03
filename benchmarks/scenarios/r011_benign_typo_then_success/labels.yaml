@@ -1,0 +1,4 @@
+name: r011_benign_typo_then_success
+kind: benign
+description: Two mistyped sudo passwords followed by a successful, ordinary command stay below the failure threshold.
+files: [auth.log]

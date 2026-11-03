@@ -1,0 +1,9 @@
+name: r007_off_hours_login
+kind: attack
+description: Successful public-key login by a regular user at 03:12 UTC.
+files: [auth.log]
+expect:
+  rules: [R007]
+  min_risk_level: informational
+forbid:
+  rules: [R005]

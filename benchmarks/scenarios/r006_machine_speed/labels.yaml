@@ -1,0 +1,9 @@
+name: r006_machine_speed
+kind: attack
+description: Twelve scripted password logins (a mix of failures and successes) arrive one per second from a single IP.
+files: [auth.log]
+expect:
+  rules: [R006]
+  min_risk_level: medium
+forbid:
+  rules: [R002, R003, R004]

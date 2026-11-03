@@ -1,0 +1,4 @@
+name: benign_normal_admin_day
+kind: benign
+description: A full day of ordinary admin sudo, cron jobs and session open/close lines.
+files: [auth.log]

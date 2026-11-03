@@ -1,0 +1,4 @@
+name: r031_benign_netcheck
+kind: benign
+description: Routine curl, nc -zv port check and ssh health checks that are not reverse shells.
+files: [auth.log]

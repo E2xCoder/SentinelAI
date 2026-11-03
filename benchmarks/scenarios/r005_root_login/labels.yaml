@@ -1,0 +1,7 @@
+name: r005_root_login
+kind: attack
+description: Successful direct root login over SSH from an external documentation IP.
+files: [auth.log]
+expect:
+  rules: [R005]
+  min_risk_level: low

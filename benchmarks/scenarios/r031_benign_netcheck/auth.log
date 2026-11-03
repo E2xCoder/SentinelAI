@@ -1,0 +1,4 @@
+2026-01-07T12:00:01+00:00 app01 sudo[4201]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/curl -fsS https://status.example.test/health
+2026-01-07T12:01:10+00:00 app01 sudo[4202]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/nc -zv 192.0.2.20 5432
+2026-01-07T12:02:30+00:00 app01 sudo[4203]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/ping -c 3 198.51.100.5
+2026-01-07T12:03:30+00:00 app01 sudo[4204]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/systemctl status nginx

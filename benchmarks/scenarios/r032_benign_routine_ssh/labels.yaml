@@ -1,0 +1,4 @@
+name: r032_benign_routine_ssh
+kind: benign
+description: An admin host logs in repeatedly to the same two hosts, below the distinct-host threshold.
+files: [auth.log]

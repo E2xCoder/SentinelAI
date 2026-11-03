@@ -1,0 +1,8 @@
+2026-01-07T14:00:00+00:00 web01 sshd[1020]: Failed password for jsmith from 203.0.113.21 port 43000 ssh2
+2026-01-07T14:00:15+00:00 web01 sshd[1021]: Failed password for jsmith from 198.51.100.22 port 43002 ssh2
+2026-01-07T14:00:30+00:00 web01 sshd[1022]: Failed password for jsmith from 192.0.2.23 port 43004 ssh2
+2026-01-07T14:00:45+00:00 web01 sshd[1023]: Failed password for jsmith from 203.0.113.21 port 43006 ssh2
+2026-01-07T14:01:00+00:00 web01 sshd[1024]: Failed password for jsmith from 198.51.100.22 port 43008 ssh2
+2026-01-07T14:01:15+00:00 web01 sshd[1025]: Failed password for jsmith from 192.0.2.23 port 43010 ssh2
+2026-01-07T14:01:30+00:00 web01 sshd[1026]: Failed password for jsmith from 203.0.113.21 port 43012 ssh2
+2026-01-07T14:01:45+00:00 web01 sshd[1027]: Failed password for jsmith from 198.51.100.22 port 43014 ssh2

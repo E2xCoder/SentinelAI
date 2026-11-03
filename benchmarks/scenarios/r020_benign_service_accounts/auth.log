@@ -1,0 +1,7 @@
+2026-01-07T08:30:10+00:00 web01 useradd[7301]: new group: name=systemd-resolve, GID=998
+2026-01-07T08:30:10+00:00 web01 useradd[7301]: new user: name=systemd-resolve, UID=998, GID=998, home=/run/systemd, shell=/usr/sbin/nologin
+2026-01-07T08:31:44+00:00 web01 useradd[7302]: new group: name=www-data, GID=33
+2026-01-07T08:31:44+00:00 web01 useradd[7302]: new user: name=www-data, UID=33, GID=33, home=/var/www, shell=/usr/sbin/nologin
+2026-01-07T08:33:02+00:00 web01 useradd[7303]: new user: name=nginx, UID=1002, GID=1002, home=/var/lib/nginx, shell=/usr/sbin/nologin
+2026-01-07T08:34:15+00:00 web01 useradd[7304]: new user: name=_chrony, UID=996, GID=996, home=/nonexistent, shell=/usr/sbin/nologin
+2026-01-07T08:35:50+00:00 web01 useradd[7305]: new user: name=sshd, home=/run/sshd, shell=/usr/sbin/nologin

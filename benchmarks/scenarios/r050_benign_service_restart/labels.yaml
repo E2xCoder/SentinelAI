@@ -1,0 +1,4 @@
+name: r050_benign_service_restart
+kind: benign
+description: A non-critical service (nginx, cron) is restarted and starts cleanly.
+files: [syslog.log]

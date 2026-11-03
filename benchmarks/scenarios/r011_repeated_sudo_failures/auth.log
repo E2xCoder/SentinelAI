@@ -1,0 +1,3 @@
+2026-01-07T14:20:01+00:00 web01 sudo[5101]: carol : 1 incorrect password attempt ; TTY=pts/0 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T14:20:15+00:00 web01 sudo[5102]: carol : 1 incorrect password attempt ; TTY=pts/0 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T14:20:29+00:00 web01 sudo[5103]: carol : 1 incorrect password attempt ; TTY=pts/0 ; PWD=/home/carol ; USER=root ; COMMAND=/usr/bin/apt update

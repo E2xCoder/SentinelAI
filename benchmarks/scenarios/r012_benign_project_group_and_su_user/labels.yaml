@@ -1,0 +1,4 @@
+name: r012_benign_project_group_and_su_user
+kind: benign
+description: An admin is added to a non-privileged project group and uses su to a service user, not root.
+files: [auth.log]

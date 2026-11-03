@@ -1,0 +1,3 @@
+2026-01-07T04:44:10+00:00 web01 sudo[1601]: dave : TTY=pts/1 ; PWD=/home/dave ; USER=root ; COMMAND=/usr/bin/cp /tmp/update.service /etc/systemd/system/update.service
+2026-01-07T04:44:25+00:00 web01 sudo[1602]: dave : TTY=pts/1 ; PWD=/home/dave ; USER=root ; COMMAND=/usr/bin/systemctl daemon-reload
+2026-01-07T04:44:31+00:00 web01 sudo[1603]: dave : TTY=pts/1 ; PWD=/home/dave ; USER=root ; COMMAND=/usr/bin/systemctl enable update.service

@@ -1,0 +1,4 @@
+name: r020_benign_service_accounts
+kind: benign
+description: Package installs create system and service accounts that R020 must suppress.
+files: [auth.log]

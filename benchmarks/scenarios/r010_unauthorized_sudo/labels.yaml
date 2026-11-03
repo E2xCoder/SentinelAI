@@ -1,0 +1,8 @@
+name: r010_unauthorized_sudo
+kind: attack
+description: A user absent from sudoers tries to read /etc/shadow via sudo twice.
+files: [auth.log]
+expect:
+  rules: [R010]
+forbid:
+  rules: [R011]

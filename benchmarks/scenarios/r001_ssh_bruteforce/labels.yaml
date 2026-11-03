@@ -1,0 +1,9 @@
+name: r001_ssh_bruteforce
+kind: attack
+description: Six rapid password failures for one account from a single documentation IP.
+files: [auth.log]
+expect:
+  rules: [R001]
+  min_risk_level: medium
+forbid:
+  rules: [R002, R003, R004, R006]

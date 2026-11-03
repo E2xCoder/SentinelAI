@@ -1,0 +1,7 @@
+name: r031_reverse_shell
+kind: attack
+description: A sudo session runs a bash /dev/tcp connect-back and an nc -e shell to a documentation IP.
+files: [auth.log]
+expect:
+  rules: [R031]
+  min_risk_level: medium

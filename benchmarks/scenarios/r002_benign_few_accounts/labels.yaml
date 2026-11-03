@@ -1,0 +1,4 @@
+name: r002_benign_few_accounts
+kind: benign
+description: Three colleagues behind one NAT address mistype passwords, below the spray threshold.
+files: [auth.log]

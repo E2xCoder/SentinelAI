@@ -1,0 +1,6 @@
+name: r051_firewall_disabled
+kind: attack
+description: A sudo user disables ufw and flushes iptables.
+files: [auth.log]
+expect:
+  rules: [R051]

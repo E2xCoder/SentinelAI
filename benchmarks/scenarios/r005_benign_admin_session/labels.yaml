@@ -1,0 +1,4 @@
+name: r005_benign_admin_session
+kind: benign
+description: A named non-root administrator logs in with a public key during the day.
+files: [auth.log]

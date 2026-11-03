@@ -1,0 +1,7 @@
+name: r032_lateral_movement
+kind: attack
+description: One internal source logs in successfully to four distinct hosts within a few minutes.
+files: [auth.log]
+expect:
+  rules: [R032]
+  min_risk_level: medium

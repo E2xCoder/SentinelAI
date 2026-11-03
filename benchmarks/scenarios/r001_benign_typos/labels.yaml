@@ -1,0 +1,4 @@
+name: r001_benign_typos
+kind: benign
+description: A user mistypes the password three times then logs in successfully.
+files: [auth.log]

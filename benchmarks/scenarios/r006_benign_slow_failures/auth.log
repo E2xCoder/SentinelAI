@@ -1,0 +1,6 @@
+2026-01-07T18:00:00+00:00 web01 sshd[1073]: Failed password for deploy from 192.0.2.61 port 49000 ssh2
+2026-01-07T18:02:00+00:00 web01 sshd[1074]: Failed password for deploy from 192.0.2.61 port 49002 ssh2
+2026-01-07T18:04:00+00:00 web01 sshd[1075]: Failed password for deploy from 192.0.2.61 port 49004 ssh2
+2026-01-07T18:06:00+00:00 web01 sshd[1076]: Failed password for deploy from 192.0.2.61 port 49006 ssh2
+2026-01-07T18:08:00+00:00 web01 sshd[1077]: Failed password for deploy from 192.0.2.61 port 49008 ssh2
+2026-01-07T18:10:00+00:00 web01 sshd[1078]: Failed password for deploy from 192.0.2.61 port 49010 ssh2

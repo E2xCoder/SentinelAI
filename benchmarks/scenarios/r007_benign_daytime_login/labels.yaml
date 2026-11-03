@@ -1,0 +1,4 @@
+name: r007_benign_daytime_login
+kind: benign
+description: The same user logs in at 14:05 UTC during normal working hours.
+files: [auth.log]

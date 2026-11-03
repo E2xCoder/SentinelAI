@@ -1,0 +1,4 @@
+name: r042_benign_service_restart
+kind: benign
+description: An admin restarts and inspects services without enabling or installing units.
+files: [auth.log]

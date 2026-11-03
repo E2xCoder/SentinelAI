@@ -1,0 +1,9 @@
+name: r002_password_spray
+kind: attack
+description: One source tries a single password against four different accounts.
+files: [auth.log]
+expect:
+  rules: [R002]
+  min_risk_level: medium
+forbid:
+  rules: [R001, R003]

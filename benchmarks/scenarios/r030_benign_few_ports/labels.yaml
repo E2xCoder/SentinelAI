@@ -1,0 +1,4 @@
+name: r030_benign_few_ports
+kind: benign
+description: A scanner-like host is blocked on only 5 distinct ports, below the scan threshold.
+files: [ufw.log]

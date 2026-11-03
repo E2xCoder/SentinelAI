@@ -1,0 +1,5 @@
+2026-01-07T10:00:01+00:00 web01 passwd[8201]: password for 'bob' changed by 'root'
+2026-01-07T10:05:30+00:00 web01 groupadd[8202]: new group: name=reports, GID=2001
+2026-01-07T10:06:12+00:00 web01 usermod[8203]: add 'bob' to group 'reports'
+2026-01-07T10:06:12+00:00 web01 usermod[8203]: add 'bob' to shadow group 'reports'
+2026-01-07T10:07:40+00:00 web01 chage[8204]: changed user 'bob' password expiry information

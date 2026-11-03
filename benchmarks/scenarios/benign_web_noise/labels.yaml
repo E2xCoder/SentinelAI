@@ -1,0 +1,4 @@
+name: benign_web_noise
+kind: benign
+description: Ordinary nginx traffic with mostly 200s, a few 404s and search-engine crawls.
+files: [nginx_access.log]

@@ -1,0 +1,8 @@
+name: r012_user_added_to_sudo_group
+kind: attack
+description: An existing account is added to the sudo group.
+files: [auth.log]
+expect:
+  rules: [R012]
+forbid:
+  rules: [R020]

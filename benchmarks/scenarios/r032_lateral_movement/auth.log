@@ -1,0 +1,4 @@
+2026-01-07T12:00:05+00:00 web01 sshd[2101]: Accepted publickey for svcdeploy from 192.0.2.50 port 52101 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:01:20+00:00 db01 sshd[2102]: Accepted publickey for svcdeploy from 192.0.2.50 port 52102 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:02:40+00:00 app01 sshd[2103]: Accepted publickey for svcdeploy from 192.0.2.50 port 52103 ssh2: RSA SHA256:AAAAfakefingerprint
+2026-01-07T12:04:00+00:00 backup01 sshd[2104]: Accepted publickey for svcdeploy from 192.0.2.50 port 52104 ssh2: RSA SHA256:AAAAfakefingerprint

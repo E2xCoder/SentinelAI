@@ -1,0 +1,9 @@
+name: r004_repeated_failures
+kind: attack
+description: Ten slow failures against one account, below per-source brute-force rate.
+files: [auth.log]
+expect:
+  rules: [R004]
+  min_risk_level: low
+forbid:
+  rules: [R001, R003, R006]

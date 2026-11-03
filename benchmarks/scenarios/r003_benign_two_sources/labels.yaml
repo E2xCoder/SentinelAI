@@ -1,0 +1,4 @@
+name: r003_benign_two_sources
+kind: benign
+description: One user fails from laptop and phone, eight attempts but only two source IPs.
+files: [auth.log]
