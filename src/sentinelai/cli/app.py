@@ -36,8 +36,13 @@ from sentinelai.utils.logging import setup_logging
 @click.pass_context
 def cli(ctx: click.Context, config_path: str | None, debug: bool, no_plugins: bool) -> None:
     """SentinelAI — AI-assisted security log analysis and response."""
+    # A broken overlay must never block the commands that can repair it.
+    rest = [*ctx.args, *sys.argv[1:]]
+    skip_overlay = ctx.invoked_subcommand == "tune" and any(
+        flag in rest for flag in ("--rollback", "--history")
+    )
     try:
-        config = load_config(config_path)
+        config = load_config(config_path, apply_overlay=not skip_overlay)
     except SentinelError as exc:
         ui.error_console.print(f"[red]Configuration error:[/red] {exc}")
         raise SystemExit(exc.exit_code) from exc

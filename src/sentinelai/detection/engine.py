@@ -7,25 +7,49 @@ spans thousands of log lines produces one evolving alert, not thousands.
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timezone
 
 from sentinelai.config.models import DetectionConfig
 from sentinelai.core.models import Alert, LogEvent
 from sentinelai.detection import rules as _rules  # noqa: F401 - registers built-ins
 from sentinelai.detection.base import Rule, RuleContext, available_rules
+from sentinelai.detection.suppression import SuppressionMatcher
 from sentinelai.utils.logging import get_logger
 
 _LOGGER = get_logger("detection.engine")
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class RuleEngine:
     """Evaluates every enabled rule against a stream of events."""
 
-    def __init__(self, config: DetectionConfig) -> None:
+    def __init__(
+        self,
+        config: DetectionConfig,
+        now: Callable[[], datetime] | None = None,
+    ) -> None:
         self._config = config
         self._ctx = RuleContext(config)
         self._rules = self._load_rules(config)
         self._recent: dict[str, tuple[Alert, datetime]] = {}
+        clock = now if now is not None else _utc_now
+        self._suppressor = SuppressionMatcher(config.parsed_suppressions(), clock)
+        self._suppressed_total = 0
+        self._suppressed_by_rule: dict[str, int] = {}
+
+    @property
+    def suppressed_total(self) -> int:
+        """Number of alerts dropped by analyst-approved suppressions."""
+        return self._suppressed_total
+
+    @property
+    def suppressed_by_rule(self) -> dict[str, int]:
+        """Suppressed alert counts per rule id (a copy)."""
+        return dict(self._suppressed_by_rule)
 
     @staticmethod
     def _load_rules(config: DetectionConfig) -> list[Rule]:
@@ -62,6 +86,13 @@ class RuleEngine:
                 continue
             if alert is None:
                 continue
+            if self._suppressor.match(alert) is not None:
+                self._suppressed_total += 1
+                self._suppressed_by_rule[alert.rule_id] = (
+                    self._suppressed_by_rule.get(alert.rule_id, 0) + 1
+                )
+                _LOGGER.debug("Suppressed alert %s by analyst suppression", alert.rule_id)
+                continue
             merged = self._dedup(alert)
             if merged is not None:
                 raised.append(merged)
@@ -89,3 +120,5 @@ class RuleEngine:
         """Clear all sliding-window and dedup state."""
         self._ctx.state.clear()
         self._recent.clear()
+        self._suppressed_total = 0
+        self._suppressed_by_rule.clear()

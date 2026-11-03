@@ -17,6 +17,11 @@
 #   SENTINELAI_INTEL_ABUSEIPDB_API_KEY=xxxx
 #   SENTINELAI_RESPONSE_ENABLED=true
 # Environment variables win over the file, so API keys need never touch disk.
+#
+# `sentinel tune --apply` never edits this file. Approved tuning changes
+# (thresholds, suppressions, risk weights) are written to the machine-managed
+# overlay <state_dir>/tuning.yaml. Precedence: defaults < config.yaml < overlay
+# < environment. Overlay suppressions are ADDED to those listed here.
 # =============================================================================
 
 # Directory for runtime state (alert DB, TI cache, saved models).
@@ -77,6 +82,29 @@ detection:
   # (sshd, www-data, systemd-*, mysql, postgres, etc.). Shell-style
   # wildcards are supported (*, ?).
   service_account_allowlist: []   # e.g. ["myapp-*", "deploy", "ci-runner"]
+
+  # Time-boxed suppressions of one rule for a user and/or a source network.
+  # Each entry needs `rule`, `expires` (ISO date or datetime, UTC) and at least
+  # one of `user` / `ip` (single IP or CIDR); `note` is optional (<= 200 chars).
+  # Expired entries are ignored. Alerts whose own severity is critical are
+  # never suppressed. Suppressed alerts are counted and shown in reports.
+  # `sentinel tune` limits (/24 or /64 at most, 90 days, 5 per rule) apply to
+  # the proposals it generates, not to entries written here.
+  suppressions: []
+  #  - rule: R001
+  #    user: deploy
+  #    ip: 198.51.100.0/24
+  #    expires: "2026-12-31"
+  #    note: nightly deploy job
+
+# -----------------------------------------------------------------------------
+# Risk scoring
+# -----------------------------------------------------------------------------
+risk:
+  # Per-rule multiplier on the risk score, 0.5..1.5 (default 1.0 = unchanged).
+  rule_weights: {}
+  #  R001: 0.8
+  #  R007: 0.6
 
 # -----------------------------------------------------------------------------
 # Threat intelligence (all providers OFF by default)

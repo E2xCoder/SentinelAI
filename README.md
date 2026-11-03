@@ -24,6 +24,7 @@ firewall automation through a clean adapter boundary.
 - [CLI usage](#cli-usage)
 - [Detection rules](#detection-rules)
 - [Evaluation benchmark](#evaluation-benchmark)
+- [Feedback and tuning](#feedback-and-tuning)
 - [Threat detection example](#threat-detection-example)
 - [AI explanation example](#ai-explanation-example)
 - [Firewall integration](#firewall-integration)
@@ -112,6 +113,8 @@ Packages (`src/sentinelai/`):
 | `firewall`   | `FirewallController` protocol, adapters, auto-responder    |
 | `monitor`    | Rotation-aware tailer, live monitor, replay                |
 | `reporting`  | Report builder + JSON/CSV/HTML renderers                   |
+| `evaluation` | Frozen benchmark runner, metrics, baseline comparison      |
+| `tuning`     | Feedback-driven proposals, policy limits, gate, overlay    |
 | `search`     | Composable event query/filter engine                       |
 | `plugins`    | Directory-based plugin loader                              |
 | `cli`        | click + rich command-line interface                        |
@@ -210,6 +213,9 @@ sentinel config
 | `sentinel report <file>`   | Summarize a previously generated JSON report             |
 | `sentinel rules`           | List all detection rules with MITRE mappings             |
 | `sentinel eval`            | Run the frozen detection benchmark (precision/recall)    |
+| `sentinel feedback <id>`   | Label a stored alert as true (`--tp`) or false (`--fp`) positive |
+| `sentinel review`          | Interactively label recent, unlabelled alerts            |
+| `sentinel tune`            | Propose, gate and (`--apply`) apply feedback-driven tuning |
 | `sentinel config`          | Show effective configuration and component status        |
 | `sentinel version`         | Show the version                                         |
 
@@ -421,6 +427,154 @@ Found while building the benchmark and still open:
 Fixed using the benchmark: R051 no longer flags plain `ufw allow`, R060 no
 longer fires on `privileged: false`, and `pam_faillock` lines logged by sshd
 are now classified as `ACCOUNT_LOCKED`.
+
+---
+
+## Feedback and tuning
+
+You label alerts as true or false positives; `sentinel tune` turns those labels
+into small, reviewable proposals and checks each one before anything changes.
+
+**The promise:** the loop never changes code or model weights. It only proposes
+small, bounded edits to a machine-managed overlay file, and nothing is applied
+without `--apply`.
+
+### Workflow
+
+1. Scan as usual (`sentinel scan ...`); alerts are stored.
+2. Label them: `sentinel review` (interactive: `t` true positive, `f` false
+   positive with an optional note, `s` skip, `q` quit) or
+   `sentinel feedback <id> --tp|--fp [--note "..."]`. Labelling an alert again
+   replaces the earlier verdict.
+3. `sentinel tune` lists the proposals, each marked **ACCEPT** or **REJECT**
+   with a reason, and prints the accepted ones as YAML. It changes nothing.
+4. `sentinel tune --apply` writes the accepted proposals to the overlay.
+5. `sentinel tune --history` lists applied and rolled-back changes;
+   `sentinel tune --rollback` undoes the latest apply.
+
+| `sentinel tune` option | Description                                                    |
+|------------------------|----------------------------------------------------------------|
+| `--apply`              | Write the accepted proposals to the overlay                    |
+| `--only <id>`          | Restrict to this proposal id (repeatable); unknown ids fail    |
+| `--force`              | Relax the soft limits below (never the hard ones)              |
+| `--benchmarks <dir>`   | Frozen benchmark root used by the gate (default `benchmarks`)  |
+| `--yaml-out <file>`    | Also write the accepted proposals as YAML to this path         |
+| `--history`            | Show applied and rolled-back changes                           |
+| `--rollback`           | Undo the latest applied change and exit                        |
+
+### What can change
+
+| Change type        | Overlay key                  | Effect                                            |
+|--------------------|------------------------------|---------------------------------------------------|
+| Threshold          | `detection.<threshold>`      | Raise a count threshold of R001, R002, R003, R004, R006 or R030 |
+| Suppression        | `detection.suppressions`     | Narrow, time-boxed: one rule for a user and/or a small network |
+| Risk weight        | `risk.rule_weights`          | Multiply the risk score of one rule (lowered by 20% per step) |
+
+A threshold proposal is generated when the false positives sit below the lowest
+labelled true positive. A risk-weight proposal is only generated for a rule
+that got neither a threshold nor a suppression proposal. The loop cannot
+disable rules.
+
+### How the gate decides
+
+A proposal is accepted only if all three hold:
+
+1. Frozen benchmark: attack recall must not drop and no previously passing
+   scenario may fail (the benchmark is run before and after the change).
+2. Analyst-labelled false positives that still alert must measurably decrease.
+3. No analyst-labelled true positive may stop alerting.
+
+Proposals are gated one by one. On `--apply`, the accepted set is gated again as
+a whole, and the apply is aborted if that fails. With no labelled alerts a
+proposal cannot be verified and is rejected.
+
+### Hard limits
+
+Enforced in code, not in configuration.
+
+| Limit                                                        | `--force`   |
+|--------------------------------------------------------------|-------------|
+| Threshold stays within 0.5x-2x of its default                | Overridable |
+| Suppressing a rule whose severity is critical                | Overridable |
+| Suppression needs a user and/or a network no broader than /24 (IPv4) or /64 (IPv6) | No |
+| Suppression expires within 90 days (default 30)              | No          |
+| At most 5 active suppressions per rule                       | No          |
+| Risk weight between 0.5 and 1.5                              | No          |
+| Overlay may only contain thresholds, suppressions and risk weights | No    |
+
+Alerts whose own severity is critical are **never** suppressed, whatever the
+configuration says.
+
+The proposal limits apply to what the loop generates. Suppressions you write by
+hand in `config.yaml` are validated for shape (`rule`, at least one of `user` /
+`ip`, `expires`, optional `note`) but not against the limits above; risk
+weights are range-checked wherever they are set.
+
+### Where things live
+
+| What                | Location                                              |
+|---------------------|-------------------------------------------------------|
+| Overlay             | `<state_dir>/tuning.yaml` (`config.yaml` is never rewritten) |
+| Backups             | `<state_dir>/tuning/history/NNNN-before-apply.yaml`   |
+| Audit log           | `<state_dir>/tuning/audit.jsonl` (append-only)        |
+| Labels, history     | `<state_dir>/alerts.db`                               |
+
+Precedence, lowest to highest: built-in defaults, `config.yaml`, overlay,
+environment variables. Overlay suppressions are added to the ones in
+`config.yaml`; they never replace them.
+
+Suppressed alerts are not dropped silently: they are counted
+(`Suppressed (analyst rules): N`) and shown in reports.
+
+`sentinel tune` needs the frozen `benchmarks/` directory (a repository checkout)
+or `--benchmarks PATH`. If it cannot find `scenarios/` there it refuses to
+apply.
+
+### Example session
+
+```
+$ sentinel feedback 12 --fp --note "nightly deploy job"
+Recorded alert #12 (R001) as false positive.
+$ sentinel review --limit 10
+...
+Labelled 6 alert(s).
+
+$ sentinel tune
+                              Tuning proposals
+ ID        │ Rule │ Kind        │ Change                              │ Verdict │ Reason
+───────────┼──────┼─────────────┼─────────────────────────────────────┼─────────┼──────────────────────────
+ P3f9a1c2e │ R001 │ threshold   │ brute_force_attempts: 5 -> 7        │ REJECT  │ benchmark regressions: scenario: r001_ssh_bruteforce
+ P8b04d7a6 │ R001 │ suppression │ suppress R001 (user=deploy,         │ ACCEPT  │ benchmark attack recall unchanged at 1.0000
+           │      │             │ ip=198.51.100.0/24) until 2026-12-03│         │
+
+Accepted proposals (YAML):
+# Proposed changes - nothing is applied until you run: sentinel tune --apply
+- id: P8b04d7a6
+  kind: suppression
+  ...
+
+Nothing was changed. Re-run with --apply to write the overlay.
+
+$ sentinel tune --apply --only P8b04d7a6
+Applied P8b04d7a6.
+Overlay: /home/analyst/.sentinelai/tuning.yaml
+History id: 1
+Undo with: sentinel tune --rollback
+
+$ sentinel tune --rollback
+Rolled back change #1 (proposals: P8b04d7a6).
+There was no overlay before that change, so it was removed.
+```
+
+### Limitations
+
+- Proposals come from simple heuristics over labelled alerts. A rule is only
+  considered with at least 3 labelled alerts, at least 3 of them false
+  positives, and a false-positive share of at least 60%.
+- The benchmark is synthetic, so the gate protects against regressions, not
+  against every real-world miss.
+- Threshold raises are often rejected, because the frozen benchmark attacks sit
+  close to the default thresholds. A narrow suppression is then the usual outcome.
 
 ---
 

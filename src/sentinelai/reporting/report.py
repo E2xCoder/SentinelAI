@@ -111,6 +111,10 @@ def build_report(
             "noisiest_source_ips": behavior_sources,
             "most_targeted_users": behavior_targets,
         },
+        "suppressed_alerts": {
+            "total": sum(stats.suppressed.values()),
+            "by_rule": dict(sorted(stats.suppressed.items())),
+        },
         "timeline": timeline,
     }
     return Report(

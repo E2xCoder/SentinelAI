@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -181,13 +181,19 @@ def _chain_events(scenario: Scenario) -> Iterator[LogEvent]:
         yield from read_events(scenario.directory / name)
 
 
-def _build_config(scenario: Scenario, state_root: Path) -> SentinelConfig:
+def _build_config(
+    scenario: Scenario,
+    state_root: Path,
+    configure: Callable[[SentinelConfig], None] | None = None,
+) -> SentinelConfig:
     scenario_state = state_root / scenario.label.name
     config = SentinelConfig()
     config.state_dir = str(scenario_state)
     config.intel.enabled = False
     config.response.enabled = False
     config.report.output_dir = str(scenario_state / "reports")
+    if configure is not None:
+        configure(config)
     config.validate()
     return config
 
@@ -203,12 +209,20 @@ def _risk_reached(outcomes: list[AlertOutcome], label: ScenarioLabel) -> bool:
     )
 
 
-def run_scenario(scenario: Scenario, state_root: Path) -> tuple[ScenarioResult, bool]:
-    """Run one scenario; return its result and whether AI anomaly detection ran."""
+def run_scenario(
+    scenario: Scenario,
+    state_root: Path,
+    *,
+    configure: Callable[[SentinelConfig], None] | None = None,
+) -> tuple[ScenarioResult, bool]:
+    """Run one scenario; return its result and whether AI anomaly detection ran.
+
+    *configure*, if given, mutates the fresh config before validation (candidate scoring).
+    """
     label = scenario.label
     pipeline: AnalysisPipeline | None = None
     try:
-        pipeline = AnalysisPipeline(_build_config(scenario, state_root))
+        pipeline = AnalysisPipeline(_build_config(scenario, state_root, configure))
         scan = pipeline.run_scan(_chain_events(scenario), use_ai=True)
     finally:
         if pipeline is not None:
@@ -246,8 +260,15 @@ def _rule_catalog() -> Mapping[str, RuleInfo]:
     }
 
 
-def run_benchmark(root: Path) -> EvalReport:
-    """Run every scenario under *root* and aggregate the metrics."""
+def run_benchmark(
+    root: Path,
+    *,
+    configure: Callable[[SentinelConfig], None] | None = None,
+) -> EvalReport:
+    """Run every scenario under *root* and aggregate the metrics.
+
+    *configure* is passed to every scenario to score a candidate configuration.
+    """
     scenarios = load_scenarios(root)
     results: list[ScenarioResult] = []
     ai_used = False
@@ -255,7 +276,7 @@ def run_benchmark(root: Path) -> EvalReport:
         state_root = Path(tmp)
         started = time.perf_counter()
         for scenario in scenarios:
-            result, used_ai = run_scenario(scenario, state_root)
+            result, used_ai = run_scenario(scenario, state_root, configure=configure)
             results.append(result)
             ai_used = ai_used or used_ai
         elapsed = time.perf_counter() - started

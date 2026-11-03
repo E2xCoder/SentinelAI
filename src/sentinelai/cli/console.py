@@ -6,6 +6,7 @@ import contextlib
 import sys
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -111,6 +112,17 @@ def summary_panel(report: Report) -> Panel:
         lines.append("[bold]By risk:[/bold] " + "  ".join(level_bits))
     if summary.get("ai_used"):
         lines.append(f"[bold]AI anomalies:[/bold] {summary.get('ai_anomalies', 0)}")
+    suppressed = summary.get("suppressed_alerts") or {}
+    suppressed_total = int(suppressed.get("total", 0) or 0)
+    if suppressed_total > 0:
+        by_rule = suppressed.get("by_rule", {})
+        detail = ", ".join(
+            f"{escape(str(rule))}: {count}" for rule, count in sorted(by_rule.items())
+        )
+        lines.append(
+            f"[bold]Suppressed (analyst rules):[/bold] {suppressed_total}"
+            + (f" ({detail})" if detail else "")
+        )
     return Panel("\n".join(lines), title="Scan Summary", border_style="cyan")
 
 

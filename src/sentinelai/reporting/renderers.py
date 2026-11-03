@@ -133,6 +133,18 @@ def render_html(report: Report) -> str:
                 )
         parts.append("</div>")
 
+    suppressed = summary.get("suppressed_alerts", {})
+    suppressed_total = int(suppressed.get("total", 0) or 0)
+    if suppressed_total > 0:
+        by_rule = suppressed.get("by_rule", {})
+        detail = ", ".join(f"{rule}: {count}" for rule, count in sorted(by_rule.items()))
+        parts.append(
+            "<div class='levels'><span class='pill' style='background:#6b7280'>"
+            f"Suppressed by analyst rules: {_esc(suppressed_total)}</span>"
+            + (f"<span class='muted'>{_esc(detail)}</span>" if detail else "")
+            + "</div>"
+        )
+
     if report.recommendations:
         parts.append("<h2>Recommendations</h2><ul class='recs'>")
         parts.extend(f"<li>{_esc(rec)}</li>" for rec in report.recommendations)

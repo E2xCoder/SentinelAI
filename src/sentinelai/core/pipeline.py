@@ -43,6 +43,7 @@ class ScanStatistics:
     unique_hosts: set[str] = field(default_factory=set)
     first_event: datetime | None = None
     last_event: datetime | None = None
+    suppressed: Counter[str] = field(default_factory=Counter)
 
     def observe(self, event: LogEvent) -> None:
         self.total_events += 1
@@ -80,7 +81,7 @@ class AnalysisPipeline:
         state_dir = config.resolve_state_dir()
         self.store = AlertStore(state_dir / "alerts.db")
         self.rule_engine = RuleEngine(config.detection)
-        self.risk_engine = RiskEngine()
+        self.risk_engine = RiskEngine(rule_weights=config.risk.rule_weights)
         self.intel = ThreatIntelAggregator(config.intel, state_dir)
         self.ai = AIEngine(config.ai)
         self.firewall = create_firewall(config.firewall)
@@ -139,6 +140,7 @@ class AnalysisPipeline:
         for alert in alerts:
             if alert.ai and alert.ai.patterns and alert.id is not None:
                 self.store.update(alert)
+        stats.suppressed = Counter(self.rule_engine.suppressed_by_rule)
         _LOGGER.debug(
             "Scan complete: %d events, %d alerts, %d patterns",
             stats.total_events,

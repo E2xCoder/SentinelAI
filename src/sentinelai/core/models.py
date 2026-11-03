@@ -240,9 +240,11 @@ class AIInsight:
     explanation: str | None = None
     explanation_source: str | None = None
     confidence: float | None = None
+    #: Advisory structured triage (``TriageResult.to_dict()`` + ``source``/``language``).
+    triage: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "anomaly_score": self.anomaly_score,
             "is_anomaly": self.is_anomaly,
             "model": self.model,
@@ -251,6 +253,9 @@ class AIInsight:
             "explanation_source": self.explanation_source,
             "confidence": self.confidence,
         }
+        if self.triage is not None:
+            data["triage"] = self.triage
+        return data
 
 
 @dataclass(slots=True)

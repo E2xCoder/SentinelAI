@@ -3,8 +3,10 @@
 Precedence (highest wins):
 
 1. ``SENTINELAI_*`` environment variables (e.g. ``SENTINELAI_INTEL_ABUSEIPDB_API_KEY``)
-2. The YAML config file (``--config``, ``./config.yaml`` or ``~/.sentinelai/config.yaml``)
-3. Built-in defaults
+2. The machine-managed tuning overlay (``tuning.yaml`` in the state directory),
+   restricted to tunable detection thresholds, suppressions and risk weights
+3. The YAML config file (``--config``, ``./config.yaml`` or ``~/.sentinelai/config.yaml``)
+4. Built-in defaults
 
 API keys therefore never need to live on disk.
 """
@@ -18,13 +20,17 @@ from typing import Any
 
 import yaml
 
-from sentinelai.config.models import SentinelConfig
+from sentinelai.config.models import TUNABLE_DETECTION_FIELDS, SentinelConfig
 from sentinelai.core.exceptions import ConfigError
 from sentinelai.utils.logging import get_logger
+from sentinelai.utils.paths import default_state_dir
 
 _LOGGER = get_logger("config")
 
 _ENV_PREFIX = "SENTINELAI_"
+
+_OVERLAY_FILENAME = "tuning.yaml"
+_OVERLAY_ALLOWED = "detection (tunable fields only) and risk.rule_weights"
 
 _DEFAULT_LOCATIONS = (
     Path("config.yaml"),
@@ -152,13 +158,76 @@ def _apply_env_parts(obj: Any, parts: list[str], value: str, env_name: str) -> b
     return False
 
 
-def load_config(explicit_path: str | Path | None = None) -> SentinelConfig:
-    """Build the full configuration with defaults, file and env merged."""
+def overlay_path(config: SentinelConfig) -> Path:
+    """Location of the machine-managed tuning overlay (may not exist)."""
+    if config.state_dir:
+        return Path(config.state_dir).expanduser() / _OVERLAY_FILENAME
+    return default_state_dir() / _OVERLAY_FILENAME
+
+
+def _restrict_overlay(data: dict[str, Any]) -> None:
+    """Reject any overlay key outside the tunable allowlist."""
+    for key, value in data.items():
+        if key not in ("detection", "risk"):
+            raise ConfigError(f"tuning overlay may only change {_OVERLAY_ALLOWED}: got {key}")
+        if not isinstance(value, dict):
+            raise ConfigError(f"tuning overlay section {key!r} must be a mapping")
+        allowed = TUNABLE_DETECTION_FIELDS if key == "detection" else ("rule_weights",)
+        for sub_key, sub_value in value.items():
+            if sub_key not in allowed:
+                raise ConfigError(
+                    f"tuning overlay may only change {_OVERLAY_ALLOWED}: got {key}.{sub_key}"
+                )
+            if sub_key == "rule_weights" and not isinstance(sub_value, dict):
+                raise ConfigError("tuning overlay key 'risk.rule_weights' must be a mapping")
+            if sub_key != "suppressions" and key == "detection" and isinstance(sub_value, bool):
+                raise ConfigError(f"tuning overlay key '{key}.{sub_key}' must be a number")
+
+
+def _apply_overlay(config: SentinelConfig) -> None:
+    """Apply ``tuning.yaml`` (if present) through the restricted path."""
+    path = overlay_path(config)
+    try:
+        exists = path.is_file()
+    except OSError as exc:
+        raise ConfigError(f"Cannot access tuning overlay {path}: {exc}") from exc
+    if not exists:
+        return
+    data = _read_yaml(path)
+    _restrict_overlay(data)
+    # Overlay suppressions ADD to those from the main config file, they never
+    # replace them (a tuning run must not silently drop the admin's own).
+    extra: list[Any] = []
+    detection = data.get("detection")
+    if isinstance(detection, dict) and "suppressions" in detection:
+        raw = detection.pop("suppressions")
+        if not isinstance(raw, list):
+            raise ConfigError("tuning overlay: detection.suppressions must be a list")
+        extra = raw
+    _apply_dict(config, data)
+    if extra:
+        config.detection.suppressions = [*config.detection.suppressions, *extra]
+    config.tuning_overlay = str(path)
+
+
+def load_config(
+    explicit_path: str | Path | None = None, *, apply_overlay: bool = True
+) -> SentinelConfig:
+    """Build the full configuration with defaults, file, overlay and env merged.
+
+    With ``apply_overlay=False`` the tuning overlay is skipped entirely (used so
+    a broken overlay cannot block ``sentinel tune --rollback`` / ``--history``).
+    """
     config = SentinelConfig()
     config_file = find_config_file(explicit_path)
     if config_file is not None:
         _apply_dict(config, _read_yaml(config_file))
         config.source_path = str(config_file)
+    # Environment first so SENTINELAI_STATE_DIR decides where the overlay is
+    # looked up; applied again afterwards so env still outranks the overlay.
     _apply_env(config)
+    if apply_overlay:
+        _apply_overlay(config)
+        _apply_env(config)
     config.validate()
     return config
