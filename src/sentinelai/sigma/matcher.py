@@ -580,17 +580,31 @@ def _eval(
     return False
 
 
+#: Total steps all Sigma rules together may spend on ONE event, so a pack of
+#: many hostile rules cannot multiply the per-rule budget.
+EVENT_STEP_POOL = 5_000_000
+_pool_event: LogEvent | None = None
+_pool_left = EVENT_STEP_POOL
+
+
 def evaluate_detection(
     detection: Detection, event: LogEvent, step_limit: int = STEP_BUDGET
 ) -> tuple[bool, bool]:
     """Return ``(matched, budget_exhausted)``; an exhausted evaluation never matches."""
+    global _pool_event, _pool_left  # noqa: PLW0603 - per-event pool, single-threaded engine
     if not event_in_logsource(detection.gates, event):
         return False, False
-    view = _EventView(event, _Steps(step_limit))
+    if _pool_event is not event:
+        _pool_event, _pool_left = event, EVENT_STEP_POOL
+    if _pool_left <= 0:
+        return False, True
+    steps = _Steps(min(step_limit, _pool_left))
     try:
-        return _eval(detection.condition, detection.selections, view, {}), False
+        return _eval(detection.condition, detection.selections, _EventView(event, steps), {}), False
     except StepBudgetExceededError:
         return False, True
+    finally:
+        _pool_left -= max(0, min(step_limit, _pool_left) - max(steps.left, 0))
 
 
 def matches(detection: Detection, event: LogEvent) -> bool:

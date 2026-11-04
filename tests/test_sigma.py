@@ -848,3 +848,19 @@ def test_sigma_rules_use_expected_category_for_sshd(tmp_path: Path) -> None:
         detection="sel:\n    Message|contains: 'x'\n  condition: sel",
     )
     assert only_rule(tmp_path).category is EventCategory.SSH
+
+
+def test_event_step_pool_caps_total_work(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sentinelai.sigma import matcher
+
+    rule = _wild_rule(tmp_path, "*a*b*c*")
+    event = cmd_event("a" * 5000)
+    monkeypatch.setattr(matcher, "EVENT_STEP_POOL", 50)
+    outcomes = [matcher.evaluate_detection(rule._parsed.detection, event) for _ in range(20)]
+    # once the shared pool is spent, later rules are refused for this event
+    assert outcomes[-1] == (False, True)
+    # a fresh event gets a fresh pool
+    assert matcher.evaluate_detection(rule._parsed.detection, cmd_event("a" * 5000))[1] in (
+        True,
+        False,
+    )
