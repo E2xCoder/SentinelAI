@@ -153,3 +153,47 @@ def test_unreadable_route_file_warns_instead_of_failing_silently(
     with caplog.at_level("WARNING"):
         assert lockout.default_gateways() == set()
     assert "gateway protection is OFF" in caplog.text
+
+
+def test_python_adapter_instantiates_a_controller_class(tmp_path, monkeypatch) -> None:
+    """A class given as ``attribute`` must be constructed, not called unbound."""
+    import sys
+    import types
+
+    from sentinelai.config.models import FirewallConfig
+    from sentinelai.firewall.adapters import PythonModuleAdapter
+
+    class Controller:
+        def __init__(self, tag: str = "") -> None:
+            self.tag = tag
+            self.blocked: set[str] = set()
+
+        def block_ip(self, ip: str) -> bool:
+            self.blocked.add(ip)
+            return True
+
+        def unblock_ip(self, ip: str) -> bool:
+            self.blocked.discard(ip)
+            return True
+
+        def temporary_block(self, ip: str, duration_seconds: int) -> bool:
+            return self.block_ip(ip)
+
+        def list_blocked(self) -> list[str]:
+            return sorted(self.blocked)
+
+    module = types.ModuleType("fake_fw_module")
+    module.Controller = Controller  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "fake_fw_module", module)
+    adapter = PythonModuleAdapter(
+        FirewallConfig(
+            adapter="python",
+            module="fake_fw_module",
+            attribute="Controller",
+            init_kwargs={"tag": "x"},
+        )
+    )
+    assert adapter.block_ip("203.0.113.1")
+    assert adapter.is_blocked("203.0.113.1")
+    assert adapter.unblock_ip("203.0.113.1")
+    assert adapter.list_blocked() == []

@@ -95,7 +95,7 @@ class PythonModuleAdapter:
                 raise FirewallError(
                     f"{config.module!r} has no attribute {config.attribute!r}"
                 ) from None
-        if callable(target) and not self._satisfies_protocol(target):
+        if callable(target) and (isinstance(target, type) or not self._satisfies_protocol(target)):
             try:
                 target = target(**config.init_kwargs)
             except Exception as exc:  # noqa: BLE001 - surface constructor errors clearly
