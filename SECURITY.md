@@ -126,5 +126,10 @@ These are not vulnerabilities to report, but you should know them:
 - The LLM prompt-injection measures reduce risk but cannot remove it; a model can
   still be steered into a wrong verdict. That is why the verdict is advisory.
 - The benchmark is synthetic. It detects regressions, not real-world misses.
+- Incident correlation links alerts by shared IP or user within a time window.
+  Attacker-controlled log values can therefore influence which alerts are
+  grouped (for example, activity of a shared account such as `root` can merge
+  with unrelated alerts). Incidents are advisory and never affect scores or
+  automated response.
 - The audit log is append-only by convention of the code, not enforced by the
   filesystem.

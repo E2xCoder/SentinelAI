@@ -17,12 +17,14 @@ from sentinelai.core.models import (
     Alert,
     EventCategory,
     EventType,
+    Incident,
     IPReputation,
     LogEvent,
     RiskAssessment,
     RiskFactor,
     RiskLevel,
     Severity,
+    TimelineEntry,
 )
 
 __all__ = [
@@ -35,6 +37,7 @@ __all__ = [
     "EventType",
     "FirewallError",
     "IPReputation",
+    "Incident",
     "LogEvent",
     "LogSourceError",
     "ParserError",
@@ -46,4 +49,5 @@ __all__ = [
     "Severity",
     "StorageError",
     "ThreatIntelError",
+    "TimelineEntry",
 ]

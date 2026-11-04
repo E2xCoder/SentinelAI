@@ -322,3 +322,178 @@ class Alert:
         if include_events:
             data["sample_events"] = [e.to_dict() for e in self.sample_events]
         return data
+
+
+def _parse_dt(value: Any) -> datetime:
+    """Parse an ISO-8601 string (or datetime) into an aware UTC datetime."""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if text[-1:] in ("Z", "z"):
+            text = text[:-1] + "+00:00"
+        parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _str_list(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item) for item in value]
+
+
+def _opt_str(value: Any) -> str | None:
+    return None if value is None else str(value)
+
+
+@dataclass(slots=True)
+class TimelineEntry:
+    """One step of an incident timeline (an alert or a collapsed run of alerts)."""
+
+    timestamp: datetime
+    alert_id: int | None
+    rule_id: str
+    title: str
+    tactic: str
+    risk_level: str
+    risk_score: float
+    count: int = 1
+    ip: str | None = None
+    user: str | None = None
+    host: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "alert_id": self.alert_id,
+            "rule_id": self.rule_id,
+            "title": self.title,
+            "tactic": self.tactic,
+            "risk_level": self.risk_level,
+            "risk_score": round(self.risk_score, 1),
+            "count": self.count,
+            "ip": self.ip,
+            "user": self.user,
+            "host": self.host,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TimelineEntry:
+        raw_id = data.get("alert_id")
+        return cls(
+            timestamp=_parse_dt(data["timestamp"]),
+            alert_id=int(raw_id) if raw_id is not None else None,
+            rule_id=str(data.get("rule_id", "")),
+            title=str(data.get("title", "")),
+            tactic=str(data.get("tactic", "")),
+            risk_level=str(data.get("risk_level", RiskLevel.INFORMATIONAL.value)),
+            risk_score=float(data.get("risk_score", 0.0)),
+            count=int(data.get("count", 1)),
+            ip=_opt_str(data.get("ip")),
+            user=_opt_str(data.get("user")),
+            host=_opt_str(data.get("host")),
+        )
+
+
+@dataclass(slots=True)
+class Incident:
+    """A correlated group of alerts forming one attack storyline (advisory only)."""
+
+    title: str
+    summary: str
+    first_seen: datetime
+    last_seen: datetime
+    score: float
+    level: RiskLevel
+    stages: list[str]
+    timeline: list[TimelineEntry]
+    ips: list[str]
+    users: list[str]
+    hosts: list[str]
+    alert_ids: list[int]
+    rule_ids: list[str]
+    mitre_techniques: list[str]
+    alert_count: int
+    id: int | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    triage: dict[str, Any] | None = None
+
+    @property
+    def fingerprint(self) -> str:
+        """Stable identity: rules + IPs + users + first-seen day."""
+        key = "|".join(
+            (
+                ",".join(sorted(self.rule_ids)),
+                ",".join(sorted(self.ips)),
+                ",".join(sorted(self.users)),
+                self.first_seen.date().isoformat(),
+            )
+        )
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a JSON-friendly dictionary."""
+        data: dict[str, Any] = {
+            "id": self.id,
+            "title": self.title,
+            "summary": self.summary,
+            "first_seen": self.first_seen.isoformat(),
+            "last_seen": self.last_seen.isoformat(),
+            "score": round(self.score, 1),
+            "level": self.level.value,
+            "stages": list(self.stages),
+            "timeline": [entry.to_dict() for entry in self.timeline],
+            "ips": list(self.ips),
+            "users": list(self.users),
+            "hosts": list(self.hosts),
+            "alert_ids": list(self.alert_ids),
+            "rule_ids": list(self.rule_ids),
+            "mitre_techniques": list(self.mitre_techniques),
+            "alert_count": self.alert_count,
+            "fingerprint": self.fingerprint,
+            "created_at": self.created_at.isoformat(),
+        }
+        if self.triage is not None:
+            data["triage"] = self.triage
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Incident:
+        """Rebuild an incident from :meth:`to_dict` output (missing optional keys tolerated)."""
+        first_seen = _parse_dt(data["first_seen"])
+        last_raw = data.get("last_seen")
+        created_raw = data.get("created_at")
+        raw_id = data.get("id")
+        timeline_raw = data.get("timeline")
+        timeline = (
+            [TimelineEntry.from_dict(t) for t in timeline_raw if isinstance(t, dict)]
+            if isinstance(timeline_raw, list)
+            else []
+        )
+        alert_ids_raw = data.get("alert_ids")
+        alert_ids = (
+            [int(a) for a in alert_ids_raw] if isinstance(alert_ids_raw, (list, tuple)) else []
+        )
+        triage = data.get("triage")
+        return cls(
+            title=str(data.get("title", "")),
+            summary=str(data.get("summary", "")),
+            first_seen=first_seen,
+            last_seen=_parse_dt(last_raw) if last_raw else first_seen,
+            score=float(data.get("score", 0.0)),
+            level=RiskLevel(data.get("level", RiskLevel.INFORMATIONAL.value)),
+            stages=_str_list(data.get("stages")),
+            timeline=timeline,
+            ips=_str_list(data.get("ips")),
+            users=_str_list(data.get("users")),
+            hosts=_str_list(data.get("hosts")),
+            alert_ids=alert_ids,
+            rule_ids=_str_list(data.get("rule_ids")),
+            mitre_techniques=_str_list(data.get("mitre_techniques")),
+            alert_count=int(data.get("alert_count", len(alert_ids))),
+            id=int(raw_id) if raw_id is not None else None,
+            created_at=_parse_dt(created_raw) if created_raw else first_seen,
+            triage=triage if isinstance(triage, dict) else None,
+        )

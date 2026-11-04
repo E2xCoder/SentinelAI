@@ -11,6 +11,7 @@ import html
 import io
 import json
 from collections.abc import Callable
+from typing import Any
 
 from sentinelai.core.models import RiskLevel
 from sentinelai.reporting.report import Report
@@ -93,6 +94,97 @@ _LEVEL_COLOR = {
 
 def _esc(value: object) -> str:
     return html.escape(str(value))
+
+
+def _level_color(value: object) -> str:
+    """Pill colour for a risk-level value; neutral grey when unknown."""
+    try:
+        return _LEVEL_COLOR[RiskLevel(str(value))]
+    except ValueError:
+        return "#6b7280"
+
+
+def _fmt_ts(value: object) -> str:
+    """Compact UTC timestamp from an ISO string (falls back to the raw text)."""
+    text = str(value or "")
+    if len(text) >= 19 and text[10] in "T ":
+        return f"{text[:10]} {text[11:19]}"
+    return text
+
+
+def _score_text(value: Any) -> str:
+    try:
+        return f"{float(value):.0f}"
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _render_incident(incident: dict[str, Any], graph: str) -> str:
+    """One incident card (all data-derived text HTML-escaped)."""
+    level = incident.get("level", "")
+    color = _level_color(level)
+    out: list[str] = [f"<div class='alert' style='border-left-color:{color}'>"]
+    out.append(
+        f"<div class='alert-head'><span class='badge' style='background:{color}'>"
+        f"{_esc(level)} · {_esc(_score_text(incident.get('score')))}</span>"
+        f"<strong>{_esc(incident.get('title', ''))}</strong></div>"
+    )
+    out.append(
+        f"<p class='muted'>{_esc(_fmt_ts(incident.get('first_seen')))} → "
+        f"{_esc(_fmt_ts(incident.get('last_seen')))} UTC · "
+        f"{_esc(incident.get('alert_count', 0))} alert(s)</p>"
+    )
+    if incident.get("summary"):
+        out.append(f"<p>{_esc(incident['summary'])}</p>")
+    entities = [
+        f"{label}: {_esc(', '.join(str(v) for v in incident[key]))}"
+        for label, key in (("IPs", "ips"), ("Users", "users"), ("Hosts", "hosts"))
+        if incident.get(key)
+    ]
+    if entities:
+        out.append(f"<p class='muted'>{' · '.join(entities)}</p>")
+    stages = incident.get("stages") or []
+    if stages:
+        out.append("<div class='levels'>")
+        out.extend(
+            f"<span class='pill' style='background:#334155'>{i}. {_esc(stage)}</span>"
+            for i, stage in enumerate(stages, 1)
+        )
+        out.append("</div>")
+    timeline = incident.get("timeline") or []
+    if timeline:
+        out.append(
+            "<table class='data'><tr><th>Time (UTC)</th><th>Stage</th><th>Rule</th>"
+            "<th>Title</th><th>Count</th></tr>"
+        )
+        for entry in timeline:
+            out.append(
+                f"<tr><td>{_esc(_fmt_ts(entry.get('timestamp')))}</td>"
+                f"<td>{_esc(entry.get('tactic', ''))}</td>"
+                f"<td>{_esc(entry.get('rule_id', ''))}</td>"
+                f"<td>{_esc(entry.get('title', ''))}</td>"
+                f"<td>{_esc(entry.get('count', ''))}</td></tr>"
+            )
+        out.append("</table>")
+    if graph:
+        out.append(
+            "<details><summary>Mermaid graph source</summary>"
+            f"<pre>{_esc(graph)}</pre></details>"
+        )
+    out.append("</div>")
+    return "".join(out)
+
+
+def _render_incidents(report: Report) -> str:
+    """The "Incidents" section (empty string when there are none)."""
+    if not report.incidents:
+        return ""
+    graphs = report.incident_graphs
+    cards = [
+        _render_incident(incident, graphs[idx] if idx < len(graphs) else "")
+        for idx, incident in enumerate(report.incidents)
+    ]
+    return "<h2>Incidents</h2>" + "".join(cards)
 
 
 def render_html(report: Report) -> str:
@@ -194,6 +286,9 @@ def render_html(report: Report) -> str:
                 )
             parts.append("</table></div>")
         parts.append("</div>")
+
+    if report.incidents:
+        parts.append(_render_incidents(report))
 
     parts.append("<h2>Alerts</h2>")
     if not report.alerts:

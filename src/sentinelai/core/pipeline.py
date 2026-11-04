@@ -17,7 +17,7 @@ from sentinelai.ai.engine import AIEngine
 from sentinelai.ai.patterns import AttackPattern
 from sentinelai.config.models import ResponseConfig, SentinelConfig
 from sentinelai.core.exceptions import AIError
-from sentinelai.core.models import Alert, LogEvent
+from sentinelai.core.models import Alert, Incident, LogEvent
 from sentinelai.core.store import AlertStore
 from sentinelai.detection.engine import RuleEngine
 from sentinelai.firewall.adapters import create_firewall
@@ -75,6 +75,7 @@ class ScanResult:
     anomaly_count: int = 0
     ai_used: bool = False
     behavior: BehaviorAnalyzer | None = None
+    incidents: list[Incident] = field(default_factory=list)
 
 
 class AnalysisPipeline:
@@ -172,11 +173,13 @@ class AnalysisPipeline:
             if alert.ai and alert.ai.patterns and alert.id is not None:
                 self.store.update(alert)
         stats.suppressed = Counter(self.rule_engine.suppressed_by_rule)
+        incidents = self._correlate(alerts)
         _LOGGER.debug(
-            "Scan complete: %d events, %d alerts, %d patterns",
+            "Scan complete: %d events, %d alerts, %d patterns, %d incidents",
             stats.total_events,
             len(alerts),
             len(patterns),
+            len(incidents),
         )
         return ScanResult(
             alerts=alerts,
@@ -185,7 +188,23 @@ class AnalysisPipeline:
             anomaly_count=anomaly_count,
             ai_used=ai_used,
             behavior=self.ai.behavior,
+            incidents=incidents,
         )
+
+    def _correlate(self, alerts: list[Alert]) -> list[Incident]:
+        """Group alerts into advisory incidents; never raises and never alters alerts."""
+        if not alerts or not self._config.correlation.enabled:
+            return []
+        try:
+            from sentinelai.correlation.engine import correlate
+
+            incidents = correlate(alerts, self._config.correlation)
+            for incident in incidents:
+                self.store.save_incident(incident)
+            return incidents
+        except Exception as exc:  # noqa: BLE001 - correlation must never break a scan
+            _LOGGER.warning("Alert correlation skipped: %s", exc)
+            return []
 
     def close(self) -> None:
         """Release database handles."""

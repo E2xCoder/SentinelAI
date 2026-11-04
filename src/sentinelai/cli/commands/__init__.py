@@ -5,7 +5,8 @@ replay, live); ``inspection`` holds the read-only commands (explain,
 report, search, rules, config, version); ``evaluation`` holds the offline
 benchmark command (eval); ``tuning`` holds the feedback-driven tuning loop
 (feedback, review, tune); ``respond`` holds the human-approved firewall
-response command; ``setup`` holds the first-run commands (init, doctor) and
+response command; ``incidents`` holds the correlated-incident views
+(incidents, incident); ``setup`` holds the first-run commands (init, doctor) and
 ``digest`` the periodic summary command. ``app.py`` registers them on
 the root group, so adding a command is a local change here.
 """
@@ -13,6 +14,7 @@ the root group, so adding a command is a local change here.
 from sentinelai.cli.commands.analysis import analyze, live, replay, scan
 from sentinelai.cli.commands.digest import digest_cmd
 from sentinelai.cli.commands.evaluation import eval_cmd
+from sentinelai.cli.commands.incidents import incident_cmd, incidents_cmd
 from sentinelai.cli.commands.inspection import (
     config_cmd,
     explain,
@@ -42,6 +44,8 @@ ALL_COMMANDS = [
     review_cmd,
     tune_cmd,
     respond_cmd,
+    incidents_cmd,
+    incident_cmd,
     init_cmd,
     doctor_cmd,
     digest_cmd,

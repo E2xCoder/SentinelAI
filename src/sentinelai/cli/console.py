@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 import re
 import sys
+from datetime import datetime
+from typing import Any
 
 from rich.console import Console
 from rich.markup import escape
@@ -12,7 +14,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from sentinelai.core.models import Alert, RiskLevel
+from sentinelai.core.models import Alert, Incident, RiskLevel
 from sentinelai.reporting.report import Report
 
 # Ensure Unicode output works even on legacy Windows code pages (cp1252),
@@ -132,7 +134,138 @@ def summary_panel(report: Report) -> Panel:
             f"[bold]Suppressed (analyst rules):[/bold] {suppressed_total}"
             + (f" ({detail})" if detail else "")
         )
+    incident_line = _incident_summary_line(report)
+    if incident_line:
+        lines.append(incident_line)
     return Panel("\n".join(lines), title="Scan Summary", border_style="cyan")
+
+
+def _incident_summary_line(report: Report) -> str:
+    """``Incidents: N (highest: LEVEL score)`` or ``""`` when there are none."""
+    total = int(report.summary.get("incidents_total", 0) or 0)
+    if total <= 0:
+        return ""
+    line = f"[bold]Incidents:[/bold] {total}"
+    best: dict[str, Any] | None = None
+    for item in report.incidents:
+        if best is None or _num(item.get("score")) > _num(best.get("score")):
+            best = item
+    if best is not None:
+        top_level = _safe(str(best.get("level", "?")).upper())
+        line += f" (highest: {top_level} {_num(best.get('score')):.0f})"
+    return line
+
+
+def _num(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _fmt_dt(value: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    return value.strftime(fmt) if isinstance(value, datetime) else "-"
+
+
+def _entities(incident: Incident) -> str:
+    bits = [*incident.ips[:2], *incident.users[:2], *incident.hosts[:1]]
+    extra = len(incident.ips) + len(incident.users) + len(incident.hosts) - len(bits)
+    text = ", ".join(_safe(b) for b in bits) or "-"
+    return f"{text} (+{extra})" if extra > 0 else text
+
+
+def incidents_table(incidents: list[Incident], title: str = "Incidents") -> Table:
+    """Build a rich table summarizing incidents (highest risk first)."""
+    table = Table(title=title, show_lines=False, header_style="bold")
+    table.add_column("ID", justify="right", style="dim")
+    table.add_column("Risk")
+    table.add_column("Score", justify="right")
+    table.add_column("Window (UTC)")
+    table.add_column("Entities")
+    table.add_column("Alerts", justify="right")
+    table.add_column("Title")
+    for inc in sorted(incidents, key=lambda i: i.score, reverse=True):
+        window = f"{_fmt_dt(inc.first_seen)} - {_fmt_dt(inc.last_seen, '%H:%M')}"
+        table.add_row(
+            _safe(inc.id if inc.id is not None else "-"),
+            level_text(inc.level),
+            f"{inc.score:.0f}",
+            window,
+            _entities(inc),
+            str(inc.alert_count),
+            _safe(inc.title),
+        )
+    return table
+
+
+def print_incident_detail(incident: Incident, *, graph: bool = False) -> None:
+    """Print a full breakdown of one incident (optionally with Mermaid source)."""
+    incident_id = _safe(incident.id if incident.id is not None else "-")
+    console.print()
+    console.print(
+        Panel(
+            _incident_body(incident),
+            title=f"[bold]Incident #{incident_id}[/bold]",
+            border_style=_LEVEL_STYLE[incident.level].split()[-1],
+        )
+    )
+    if incident.timeline:
+        table = Table(title="Timeline", show_lines=False, header_style="bold")
+        table.add_column("Time (UTC)")
+        table.add_column("Stage")
+        table.add_column("Rule")
+        table.add_column("Risk")
+        table.add_column("Count", justify="right")
+        table.add_column("Title")
+        for entry in incident.timeline:
+            table.add_row(
+                _fmt_dt(entry.timestamp, "%Y-%m-%d %H:%M:%S"),
+                _safe(entry.tactic),
+                _safe(entry.rule_id),
+                _safe(f"{_level_value(entry.risk_level)} {entry.risk_score:.0f}"),
+                str(entry.count),
+                _safe(entry.title),
+            )
+        console.print(table)
+    if graph:
+        from sentinelai.correlation.summary import render_mermaid
+
+        console.print("[bold]Mermaid graph source:[/bold]")
+        console.print(Text(_CONTROL_CHARS.sub("", render_mermaid(incident))))
+
+
+def _level_value(level: object) -> str:
+    return str(getattr(level, "value", level))
+
+
+def _incident_body(incident: Incident) -> str:
+    lines = [
+        f"[bold]{_safe(incident.title)}[/bold]",
+        "",
+        _safe(incident.summary),
+        "",
+        f"Risk: {incident.score:.0f}/100 ({_safe(incident.level.value)})   "
+        f"Alerts: {incident.alert_count}",
+        f"Window: {_fmt_dt(incident.first_seen, '%Y-%m-%d %H:%M:%S')} - "
+        f"{_fmt_dt(incident.last_seen, '%Y-%m-%d %H:%M:%S')} UTC",
+        f"IPs: {_safe(', '.join(incident.ips) or 'n/a')}   "
+        f"Users: {_safe(', '.join(incident.users) or 'n/a')}   "
+        f"Hosts: {_safe(', '.join(incident.hosts) or 'n/a')}",
+    ]
+    if incident.stages:
+        lines.append("Kill chain: " + " > ".join(_safe(s) for s in incident.stages))
+    if incident.mitre_techniques:
+        lines.append(f"MITRE ATT&CK: {_safe(', '.join(incident.mitre_techniques))}")
+    triage = incident.triage
+    if triage:
+        confidence = _num(triage.get("confidence")) * 100
+        origin = "model" if triage.get("valid_llm") else "template fallback"
+        lines.append(
+            f"\n[bold]Triage verdict (advisory):[/bold] {_safe(triage.get('verdict', '?'))} "
+            f"({confidence:.0f}% confidence, {origin}). "
+            "[dim]It does not change the risk score or trigger any response.[/dim]"
+        )
+    return "\n".join(lines)
 
 
 def print_alert_detail(alert: Alert) -> None:

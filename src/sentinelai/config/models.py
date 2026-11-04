@@ -615,6 +615,49 @@ class NotifyConfig:
         self._validate_channels()
 
 
+_CORRELATION_LINKS: tuple[str, ...] = ("ip", "user", "host")
+
+
+def _check_finite_range(name: str, value: Any, low: float, high: float) -> None:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not low <= value <= high
+    ):
+        raise ConfigError(f"{name} must be a finite number between {low:g} and {high:g}")
+
+
+@dataclass(slots=True)
+class CorrelationConfig:
+    """Alert-to-incident correlation settings (advisory aggregation only)."""
+
+    enabled: bool = True
+    window_seconds: int = 3600
+    link_by: list[str] = field(default_factory=lambda: ["ip", "user"])
+    min_alerts: int = 2
+    stage_bonus: float = 5.0
+    max_bonus: float = 20.0
+    max_timeline: int = 200
+
+    def validate(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise ConfigError("correlation.enabled must be a boolean")
+        _check_int_range("correlation.window_seconds", self.window_seconds, 1, 604_800)
+        _check_int_range("correlation.min_alerts", self.min_alerts, 2, 100)
+        _check_finite_range("correlation.stage_bonus", self.stage_bonus, 0.0, 25.0)
+        _check_finite_range("correlation.max_bonus", self.max_bonus, 0.0, 40.0)
+        _check_int_range("correlation.max_timeline", self.max_timeline, 10, 2_000)
+        if not isinstance(self.link_by, list) or not self.link_by:
+            raise ConfigError("correlation.link_by must be a non-empty list")
+        for item in self.link_by:
+            if item not in _CORRELATION_LINKS:
+                raise ConfigError(
+                    f"correlation.link_by contains unknown item {item!r}; "
+                    f"valid: {', '.join(_CORRELATION_LINKS)}"
+                )
+
+
 @dataclass(slots=True)
 class SentinelConfig:
     """Root configuration object."""
@@ -632,6 +675,7 @@ class SentinelConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     limits: LimitsConfig = field(default_factory=LimitsConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
+    correlation: CorrelationConfig = field(default_factory=CorrelationConfig)
     source_path: str = ""
     tuning_overlay: str = ""
 
@@ -647,6 +691,7 @@ class SentinelConfig:
         self.risk.validate()
         self.limits.validate()
         self.notify.validate()
+        self.correlation.validate()
 
     def resolve_state_dir(self) -> Path:
         """Return the state directory, creating it when needed."""

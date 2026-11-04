@@ -1,0 +1,9 @@
+name: incident_ssh_chain
+kind: attack
+description: One attacker brute forces SSH, logs in as root, escalates, then plants cron persistence.
+files: [auth.log]
+expect:
+  rules: [R001, R005, R012, R040]
+  incidents: 1
+  incident_rules: [R001, R005, R012, R040]
+  incident_stages: [Credential Access, Privilege Escalation, Persistence]

@@ -39,6 +39,20 @@ class ScenarioLabel:
     min_risk_level: str | None = None
     #: Rule IDs that must NOT fire. Benign scenarios forbid every rule.
     forbid_rules: tuple[str, ...] = ()
+    #: Exact number of incidents the scan must produce (None: not checked).
+    expect_incidents: int | None = None
+    #: Exact ordered distinct rule IDs on the first incident's timeline.
+    expect_incident_rules: tuple[str, ...] = ()
+    #: Exact ordered ``stages`` of the first incident.
+    expect_incident_stages: tuple[str, ...] = ()
+
+    @property
+    def has_incident_expectation(self) -> bool:
+        return (
+            self.expect_incidents is not None
+            or bool(self.expect_incident_rules)
+            or bool(self.expect_incident_stages)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,13 +106,28 @@ class ScenarioResult:
     unexpected_rules: list[str] = field(default_factory=list)
     #: True when ``min_risk_level`` is unset or reached by an expected alert.
     risk_ok: bool = True
+    #: Number of incidents produced (None when the label has no incident expectation).
+    incidents: int | None = None
+    #: Ordered distinct rule IDs on the first incident's timeline.
+    incident_rules: list[str] = field(default_factory=list)
+    #: Ordered ``stages`` of the first incident.
+    incident_stages: list[str] = field(default_factory=list)
+    #: True when every labelled incident expectation was met.
+    incident_ok: bool = True
+    #: Whether the label set an incident expectation (controls JSON output).
+    has_incident_expectation: bool = False
 
     @property
     def passed(self) -> bool:
-        return not self.missing_rules and not self.unexpected_rules and self.risk_ok
+        return (
+            not self.missing_rules
+            and not self.unexpected_rules
+            and self.risk_ok
+            and self.incident_ok
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "name": self.name,
             "kind": self.kind,
             "events": self.events,
@@ -110,6 +139,12 @@ class ScenarioResult:
             "risk_ok": self.risk_ok,
             "passed": self.passed,
         }
+        if self.has_incident_expectation:
+            data["incidents"] = self.incidents
+            data["incident_rules"] = list(self.incident_rules)
+            data["incident_stages"] = list(self.incident_stages)
+            data["incident_ok"] = self.incident_ok
+        return data
 
 
 @dataclass(slots=True)

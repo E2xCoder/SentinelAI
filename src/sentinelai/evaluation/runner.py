@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +48,9 @@ LABELS_FILENAME = "labels.yaml"
 AI_RULE_ID = "AI001"
 
 _TOP_LEVEL_KEYS = frozenset({"name", "kind", "description", "files", "expect", "forbid"})
-_EXPECT_KEYS = frozenset({"rules", "min_risk_level"})
+_EXPECT_KEYS = frozenset(
+    {"rules", "min_risk_level", "incidents", "incident_rules", "incident_stages"}
+)
 _FORBID_KEYS = frozenset({"rules"})
 
 
@@ -95,6 +97,24 @@ def _rule_ids(value: object, field_name: str, scenario: str) -> tuple[str, ...]:
         if rule_id not in known:
             raise _fail(scenario, f"{field_name!r} references unknown rule {rule_id!r}")
     return tuple(sorted(set(ids)))
+
+
+def _ordered_rule_ids(value: object, field_name: str, scenario: str) -> tuple[str, ...]:
+    """Like :func:`_rule_ids` but keeps the given order (no sorting or dedup)."""
+    ids = _string_list(value, field_name, scenario)
+    known = set(available_rules()) | {AI_RULE_ID}
+    for rule_id in ids:
+        if rule_id not in known:
+            raise _fail(scenario, f"{field_name!r} references unknown rule {rule_id!r}")
+    return ids
+
+
+def _incident_count(value: object, scenario: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise _fail(scenario, "expect.incidents must be an integer >= 0")
+    return value
 
 
 def _validate_files(files: tuple[str, ...], directory: Path, scenario: str) -> None:
@@ -152,6 +172,19 @@ def _load_label(directory: Path) -> ScenarioLabel:
         if kind == KIND_BENIGN:
             raise _fail(scenario, "benign scenarios must not set expect.min_risk_level")
 
+    expect_incidents = _incident_count(expect.get("incidents"), scenario)
+    incident_rules = _ordered_rule_ids(
+        expect.get("incident_rules"), "expect.incident_rules", scenario
+    )
+    incident_stages = _string_list(
+        expect.get("incident_stages"), "expect.incident_stages", scenario
+    )
+    if (incident_rules or incident_stages) and (expect_incidents is None or expect_incidents < 1):
+        raise _fail(
+            scenario,
+            "expect.incident_rules and expect.incident_stages require expect.incidents >= 1",
+        )
+
     return ScenarioLabel(
         name=scenario,
         kind=str(kind),
@@ -160,6 +193,9 @@ def _load_label(directory: Path) -> ScenarioLabel:
         expect_rules=expect_rules,
         min_risk_level=min_risk_level,
         forbid_rules=forbid_rules,
+        expect_incidents=expect_incidents,
+        expect_incident_rules=incident_rules,
+        expect_incident_stages=incident_stages,
     )
 
 
@@ -209,6 +245,32 @@ def _risk_reached(outcomes: list[AlertOutcome], label: ScenarioLabel) -> bool:
     )
 
 
+def _first_incident_rules(timeline_rule_ids: list[str]) -> list[str]:
+    """Distinct rule IDs in first-seen (timeline) order."""
+    return list(dict.fromkeys(timeline_rule_ids))
+
+
+def _incident_outcome(
+    incidents: Sequence[Any], label: ScenarioLabel
+) -> tuple[int, list[str], list[str], bool]:
+    """Return (count, rules, stages, ok) for the labelled incident expectations."""
+    count = len(incidents)
+    rules: list[str] = []
+    stages: list[str] = []
+    if incidents:
+        first = incidents[0]
+        rules = _first_incident_rules([entry.rule_id for entry in first.timeline])
+        stages = list(first.stages)
+    ok = True
+    if label.expect_incidents is not None and count != label.expect_incidents:
+        ok = False
+    if label.expect_incident_rules and rules != list(label.expect_incident_rules):
+        ok = False
+    if label.expect_incident_stages and stages != list(label.expect_incident_stages):
+        ok = False
+    return count, rules, stages, ok
+
+
 def run_scenario(
     scenario: Scenario,
     state_root: Path,
@@ -250,6 +312,13 @@ def run_scenario(
         unexpected_rules=sorted(unexpected),
         risk_ok=_risk_reached(outcomes, label),
     )
+    if label.has_incident_expectation:
+        count, rules, stages, ok = _incident_outcome(scan.incidents, label)
+        result.incidents = count
+        result.incident_rules = rules
+        result.incident_stages = stages
+        result.incident_ok = ok
+        result.has_incident_expectation = True
     return result, scan.ai_used
 
 

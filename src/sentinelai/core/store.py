@@ -21,6 +21,7 @@ from sentinelai.core.models import (
     Alert,
     EventCategory,
     EventType,
+    Incident,
     IPReputation,
     LogEvent,
     RiskAssessment,
@@ -57,7 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_rule ON alerts (rule_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_risk ON alerts (risk_level);
 """
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _MIGRATION_2: tuple[str, ...] = (
     "CREATE TABLE IF NOT EXISTS feedback ("
@@ -117,8 +118,25 @@ _MIGRATION_3: tuple[str, ...] = (
     "ON response_pending (ip) WHERE status = 'pending'",
 )
 
+_MIGRATION_4: tuple[str, ...] = (
+    "CREATE TABLE IF NOT EXISTS incidents ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "fingerprint TEXT NOT NULL, "
+    "title TEXT NOT NULL, "
+    "score REAL NOT NULL, "
+    "level TEXT NOT NULL, "
+    "first_seen TEXT NOT NULL, "
+    "last_seen TEXT NOT NULL, "
+    "created_at TEXT NOT NULL, "
+    "ips TEXT NOT NULL, "
+    "users TEXT NOT NULL, "
+    "payload TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_level ON incidents (level)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_first_seen ON incidents (first_seen)",
+)
+
 # Statements executed (inside one transaction) to reach each schema version.
-_MIGRATIONS: dict[int, tuple[str, ...]] = {2: _MIGRATION_2, 3: _MIGRATION_3}
+_MIGRATIONS: dict[int, tuple[str, ...]] = {2: _MIGRATION_2, 3: _MIGRATION_3, 4: _MIGRATION_4}
 
 _FEEDBACK_LABELS = frozenset({"tp", "fp"})
 _CONFIG_ACTIONS = frozenset({"apply", "rollback"})
@@ -854,9 +872,142 @@ class AlertStore:
             raise StorageError(f"Failed to expire pending responses: {exc}") from exc
         return int(cursor.rowcount)
 
+    # -- incidents --------------------------------------------------------
+
+    def save_incident(self, incident: Incident) -> int:
+        """Persist *incident*, assigning and returning its integer id."""
+        try:
+            cursor = self._conn.execute(
+                "INSERT INTO incidents (fingerprint, title, score, level, first_seen, "
+                "last_seen, created_at, ips, users, payload) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    incident.fingerprint,
+                    incident.title,
+                    float(incident.score),
+                    incident.level.value,
+                    _utc_iso(incident.first_seen),
+                    _utc_iso(incident.last_seen),
+                    _utc_iso(incident.created_at),
+                    json.dumps(list(incident.ips)),
+                    json.dumps(list(incident.users)),
+                    json.dumps(incident.to_dict()),
+                ),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to persist incident: {exc}") from exc
+        incident.id = int(cursor.lastrowid or 0)
+        return incident.id
+
+    def update_incident(self, incident: Incident) -> None:
+        """Refresh a stored incident (payload, score, level, title)."""
+        if incident.id is None:
+            raise StorageError("Cannot update an incident that was never saved")
+        try:
+            cursor = self._conn.execute(
+                "UPDATE incidents SET title = ?, score = ?, level = ?, payload = ? WHERE id = ?",
+                (
+                    incident.title,
+                    float(incident.score),
+                    incident.level.value,
+                    json.dumps(incident.to_dict()),
+                    incident.id,
+                ),
+            )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            self._conn.rollback()
+            raise StorageError(f"Failed to update incident #{incident.id}: {exc}") from exc
+        if cursor.rowcount == 0:
+            raise StorageError(f"Incident #{incident.id} does not exist")
+
+    def get_incident(self, incident_id: int) -> Incident | None:
+        """Load one incident by id (``None`` if missing or corrupt)."""
+        try:
+            row = self._conn.execute(
+                "SELECT id, payload FROM incidents WHERE id = ?", (incident_id,)
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to read incident #{incident_id}: {exc}") from exc
+        if row is None:
+            return None
+        return _safe_incident_from_row(row[0], row[1])
+
+    def list_incidents(
+        self,
+        *,
+        limit: int = 50,
+        ip: str | None = None,
+        user: str | None = None,
+        min_level: str | None = None,
+    ) -> list[Incident]:
+        """Incidents newest first; *ip*/*user* match exact list members, *min_level* is a floor."""
+        sql = "SELECT id, ips, users, payload FROM incidents"
+        params: list[Any] = []
+        if min_level is not None:
+            try:
+                floor = RiskLevel(min_level).weight
+            except ValueError:
+                valid = ", ".join(level.value for level in RiskLevel)
+                raise StorageError(
+                    f"Unknown risk level {min_level!r}; expected one of: {valid}"
+                ) from None
+            allowed = [level.value for level in RiskLevel if level.weight >= floor]
+            sql += f" WHERE level IN ({', '.join('?' for _ in allowed)})"
+            params.extend(allowed)
+        sql += " ORDER BY id DESC"
+        wanted = max(0, int(limit))
+        result: list[Incident] = []
+        if wanted == 0:
+            return result
+        try:
+            rows = self._conn.execute(sql, params).fetchall()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to list incidents: {exc}") from exc
+        for incident_id, ips_json, users_json, payload in rows:
+            if not _json_list_contains(ips_json, ip, incident_id):
+                continue
+            if not _json_list_contains(users_json, user, incident_id):
+                continue
+            incident = _safe_incident_from_row(incident_id, payload)
+            if incident is None:
+                continue
+            result.append(incident)
+            if len(result) >= wanted:
+                break
+        return result
+
     def close(self) -> None:
         """Close the database handle."""
         self._conn.close()
+
+
+def _json_list_contains(value: Any, needle: str | None, row_id: Any) -> bool:
+    """Exact membership of *needle* in a stored JSON list (``True`` when no needle)."""
+    if needle is None:
+        return True
+    try:
+        data = json.loads(str(value))
+    except json.JSONDecodeError:
+        _LOGGER.warning("Skipping corrupt incident row %r: invalid JSON list", row_id)
+        return False
+    return isinstance(data, list) and needle in data
+
+
+def _safe_incident_from_row(incident_id: Any, payload: Any) -> Incident | None:
+    """Rebuild an incident, logging and returning ``None`` if the row is corrupt."""
+    try:
+        data = json.loads(str(payload))
+        if not isinstance(data, dict):
+            raise ValueError("payload is not a JSON object")
+        incident = Incident.from_dict(data)
+    except (ValueError, TypeError, KeyError, OverflowError) as exc:
+        _LOGGER.warning("Skipping corrupt incident row %r: %s", incident_id, exc)
+        return None
+    incident.id = int(incident_id)
+    return incident
 
 
 def _action_from_row(r: Sequence[Any]) -> ResponseActionRow:

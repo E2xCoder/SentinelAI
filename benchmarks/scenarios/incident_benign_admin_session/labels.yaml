@@ -1,0 +1,6 @@
+name: incident_benign_admin_session
+kind: benign
+description: Ordinary admin sudo, cron backup and key-based SSH session; no alert and no incident.
+files: [auth.log]
+expect:
+  incidents: 0

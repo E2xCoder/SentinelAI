@@ -168,16 +168,16 @@
   },
   "risk": {
     "attack": {
-      "alerts": 28,
+      "alerts": 32,
       "by_level": {
         "critical": 0,
-        "high": 1,
+        "high": 4,
         "informational": 2,
         "low": 8,
-        "medium": 17
+        "medium": 18
       },
-      "max": 65.0,
-      "mean": 41.7,
+      "max": 70.0,
+      "mean": 44.17,
       "min": 12.0
     },
     "benign": {
@@ -196,13 +196,13 @@
   },
   "rules": {
     "R001": {
-      "attack_scenarios": 1,
+      "attack_scenarios": 2,
       "fn": 0,
       "fp": 0,
       "name": "SSH Brute Force",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 1
+      "tp": 2
     },
     "R002": {
       "attack_scenarios": 1,
@@ -232,13 +232,13 @@
       "tp": 1
     },
     "R005": {
-      "attack_scenarios": 1,
+      "attack_scenarios": 2,
       "fn": 0,
       "fp": 0,
       "name": "Root Login",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 1
+      "tp": 2
     },
     "R006": {
       "attack_scenarios": 1,
@@ -277,13 +277,13 @@
       "tp": 2
     },
     "R012": {
-      "attack_scenarios": 2,
+      "attack_scenarios": 3,
       "fn": 0,
       "fp": 0,
       "name": "Privilege Escalation",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 2
+      "tp": 3
     },
     "R020": {
       "attack_scenarios": 2,
@@ -340,13 +340,13 @@
       "tp": 1
     },
     "R040": {
-      "attack_scenarios": 2,
+      "attack_scenarios": 3,
       "fn": 0,
       "fp": 0,
       "name": "Suspicious Cron Activity",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 2
+      "tp": 3
     },
     "R041": {
       "attack_scenarios": 1,
@@ -415,6 +415,78 @@
       "kind": "benign",
       "missing_rules": [],
       "name": "benign_web_noise",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 9,
+      "expected_rules": [],
+      "fired_rules": [],
+      "incident_ok": true,
+      "incident_rules": [],
+      "incident_stages": [],
+      "incidents": 0,
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "incident_benign_admin_session",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "high",
+          "risk_score": 65.82,
+          "rule_id": "R001"
+        },
+        {
+          "risk_level": "medium",
+          "risk_score": 45.0,
+          "rule_id": "R005"
+        },
+        {
+          "risk_level": "high",
+          "risk_score": 65.0,
+          "rule_id": "R012"
+        },
+        {
+          "risk_level": "high",
+          "risk_score": 70.0,
+          "rule_id": "R040"
+        }
+      ],
+      "events": 9,
+      "expected_rules": [
+        "R001",
+        "R005",
+        "R012",
+        "R040"
+      ],
+      "fired_rules": [
+        "R001",
+        "R005",
+        "R012",
+        "R040"
+      ],
+      "incident_ok": true,
+      "incident_rules": [
+        "R001",
+        "R005",
+        "R012",
+        "R040"
+      ],
+      "incident_stages": [
+        "Credential Access",
+        "Privilege Escalation",
+        "Persistence"
+      ],
+      "incidents": 1,
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "incident_ssh_chain",
       "passed": true,
       "risk_ok": true,
       "unexpected_rules": []
@@ -1311,14 +1383,14 @@
   "sentinelai_version": "0.1.0",
   "summary": {
     "attack_recall": 1.0,
-    "attack_scenarios": 27,
+    "attack_scenarios": 28,
     "benign_alerts": 0,
-    "benign_events": 210,
-    "benign_scenarios": 26,
+    "benign_events": 219,
+    "benign_scenarios": 27,
     "fp_per_1k_benign_events": 0.0,
     "precision": 1.0,
-    "scenarios_passed": 53,
-    "scenarios_total": 53,
+    "scenarios_passed": 55,
+    "scenarios_total": 55,
     "uncovered_rules": []
   }
 }

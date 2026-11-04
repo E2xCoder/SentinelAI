@@ -24,6 +24,9 @@ class Report:
     patterns: list[AttackPattern]
     summary: dict[str, Any] = field(default_factory=dict)
     recommendations: list[str] = field(default_factory=list)
+    incidents: list[dict[str, Any]] = field(default_factory=list)
+    #: Mermaid source per incident (index-aligned with ``incidents``); HTML only.
+    incident_graphs: list[str] = field(default_factory=list)
 
     def to_dict(self, include_events: bool = True) -> dict[str, Any]:
         """Full JSON-serializable representation of the report."""
@@ -36,6 +39,7 @@ class Report:
             "recommendations": self.recommendations,
             "attack_patterns": [p.to_dict() for p in self.patterns],
             "alerts": [a.to_dict(include_events=include_events) for a in self.alerts],
+            "incidents": self.incidents,
         }
 
 
@@ -84,6 +88,12 @@ def build_report(
             if p.failure_count
         ]
 
+    from sentinelai.correlation.summary import render_mermaid
+
+    incidents = [i.to_dict() for i in result.incidents]
+    incident_graphs = [render_mermaid(i) for i in result.incidents]
+    incident_levels: Counter[str] = Counter(i.level.value for i in result.incidents)
+
     summary = {
         "events_analyzed": stats.total_events,
         "time_range": {
@@ -116,6 +126,8 @@ def build_report(
             "by_rule": dict(sorted(stats.suppressed.items())),
         },
         "timeline": timeline,
+        "incidents_total": len(incidents),
+        "incidents_by_level": dict(incident_levels),
     }
     return Report(
         title=title,
@@ -125,6 +137,8 @@ def build_report(
         patterns=result.patterns,
         summary=summary,
         recommendations=_recommendations(alerts, result.patterns, level_counts),
+        incidents=incidents,
+        incident_graphs=incident_graphs,
     )
 
 

@@ -26,6 +26,7 @@ firewall automation through a clean adapter boundary.
 - [Evaluation benchmark](#evaluation-benchmark)
 - [Feedback and tuning](#feedback-and-tuning)
 - [Threat detection example](#threat-detection-example)
+- [Alert correlation and incidents](#alert-correlation-and-incidents)
 - [Structured LLM triage](#structured-llm-triage)
 - [Firewall integration](#firewall-integration)
 - [Safe automated response](#safe-automated-response)
@@ -61,6 +62,9 @@ firewall automation through a clean adapter boundary.
   caching, rate limiting and graceful degradation.
 - **Automated response** — blocks malicious sources through *your* firewall
   project via dependency inversion; SentinelAI never implements firewall logic.
+- **Incident correlation** — related alerts are grouped into kill-chain-ordered
+  incidents with a timeline and a Mermaid graph (see
+  [Alert correlation and incidents](#alert-correlation-and-incidents)).
 - **Live monitoring & replay** — rotation-aware tailing and historical replay.
 - **Reports** — JSON, CSV and self-contained HTML.
 - **Onboarding** — `sentinel init` writes a config for your host and
@@ -124,6 +128,7 @@ Packages (`src/sentinelai/`):
 | `firewall`   | `FirewallController` protocol, adapters, auto-responder    |
 | `monitor`    | Rotation-aware tailer, live monitor, replay                |
 | `reporting`  | Report builder + JSON/CSV/HTML renderers                   |
+| `correlation`| Alert-to-incident linking, kill-chain order, summaries     |
 | `evaluation` | Frozen benchmark runner, metrics, baseline comparison      |
 | `tuning`     | Feedback-driven proposals, policy limits, gate, overlay    |
 | `search`     | Composable event query/filter engine                       |
@@ -249,6 +254,8 @@ sentinel config
 | `sentinel replay <log>`    | Replay a historical log through detection                |
 | `sentinel search <log>`    | Search/filter events by ip/user/type/severity/date/text  |
 | `sentinel explain <id>`    | Explain a stored alert (why, attack, actions, confidence)|
+| `sentinel incidents`       | List stored incidents, highest risk first (see [Alert correlation and incidents](#alert-correlation-and-incidents)) |
+| `sentinel incident <id>`   | Show one incident: summary, kill chain, timeline (`--graph`, `--json`, `--triage`) |
 | `sentinel report <file>`   | Summarize a previously generated JSON report             |
 | `sentinel rules`           | List all detection rules with MITRE mappings             |
 | `sentinel eval`            | Run the frozen detection benchmark (precision/recall)    |
@@ -382,8 +389,9 @@ files:
 Rules, enforced when scenarios are loaded (invalid labels abort the run):
 
 - Only the keys `name`, `kind`, `description`, `files`, `expect`, `forbid` are
-  allowed at the top level; `expect` accepts `rules` and `min_risk_level`,
-  `forbid` accepts `rules`. Unknown keys are rejected.
+  allowed at the top level; `expect` accepts `rules`, `min_risk_level`,
+  `incidents`, `incident_rules` and `incident_stages`, `forbid` accepts
+  `rules`. Unknown keys are rejected.
 - `kind` is `attack` or `benign`. `files` must be a non-empty list.
 - **Benign:** any alert at all is a false positive. It must not set
   `expect.rules` or `expect.min_risk_level`.
@@ -392,6 +400,14 @@ Rules, enforced when scenarios are loaded (invalid labels abort the run):
   least one alert from `expect.rules` reaches that level. `forbid.rules` lists
   rules that must not fire.
 - Rule IDs must exist in the rule registry (or be `AI001`).
+- **Incident expectations (optional, any scenario kind):**
+  `expect.incidents` is the exact number of incidents the scan must produce
+  (an integer >= 0; `0` asserts that nothing is correlated).
+  `expect.incident_rules` is the exact, ordered list of distinct rule IDs on the
+  timeline of the first (highest-score) incident, and `expect.incident_stages`
+  is the exact, ordered `stages` list of that incident. Both of those require
+  `expect.incidents` of at least 1. A scenario fails if any labelled incident
+  expectation is not met. Example: `benchmarks/scenarios/incident_ssh_chain`.
 - File paths must be relative and stay inside the scenario directory; absolute
   paths, `..` and paths resolving outside the directory are rejected.
 
@@ -653,6 +669,147 @@ Attack patterns detected:
 The **attack-pattern recognizer** connected the dots: brute force → successful
 login → backdoor account → reverse shell → firewall tampering, all from the same
 source, and named it a multi-stage intrusion.
+
+---
+
+## Alert correlation and incidents
+
+A single alert says little; a brute force, a root login, a sudo escalation and a
+new cron job from the same source say a lot. After a scan, SentinelAI groups
+related alerts into **incidents** and orders them along the MITRE ATT&CK kill
+chain. Incidents are stored next to the alerts in `<state_dir>/alerts.db`.
+
+**The promise:** correlation is advisory aggregation. An incident never changes
+the score of any alert, never creates or suppresses an alert, and never triggers
+or blocks an automated response. Response stays per-alert and policy-based (see
+[Safe automated response](#safe-automated-response)).
+
+### What an incident is
+
+- Two alerts are linked when they share a non-empty IP, user or (optionally)
+  host (`correlation.link_by`) and their time ranges (`first_seen` to
+  `last_seen`) are at most `correlation.window_seconds` apart. Linking is
+  transitive: A-B and B-C make A, B and C one incident. Values are compared
+  case-insensitively.
+- A group needs at least `correlation.min_alerts` alerts (default 2, minimum 2).
+  A lone alert is not an incident.
+- Correlation runs once at the end of an analysis run (`sentinel scan`), over the
+  alerts of that run. It is skipped when `correlation.enabled` is false, and a
+  failure in correlation is logged and never aborts the scan.
+- Each alert contributes its furthest-along tactic as its stage. Tactics outside
+  the list below are shown as `Unclassified` and do not count as a stage.
+- **Alert storms collapse.** Alerts with the same rule, IP, user and host become
+  one timeline entry with a count (and the highest score of the group), so a
+  flood of repeats does not bury the chain. `correlation.max_timeline` caps the
+  number of entries stored; the score and stages are computed before the cap.
+- Each incident gets a deterministic English title and summary (see
+  [Limitations](#limitations-2)).
+
+### Kill-chain order and score
+
+Stages follow this order, earliest first: Reconnaissance, Resource Development,
+Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion,
+Credential Access, Discovery, Lateral Movement, Collection, Command and Control,
+Exfiltration, Impact. The timeline is sorted by time; entries with the same
+timestamp are ordered by this list. The incident's `stages` are the distinct
+stages in the order they first appear on the timeline.
+
+```
+score = min(100, max alert score + min(max_bonus, stage_bonus x (distinct stages - 1)))
+```
+
+With the defaults that is the highest alert score in the incident plus 5 for each
+additional distinct stage, at most +20, never above 100. One stage adds nothing.
+The incident level is derived from the final score with the same thresholds as
+alerts.
+
+### Commands
+
+```bash
+sentinel incidents                                # stored incidents, highest risk first
+sentinel incidents --min-level high --ip 203.0.113.55
+sentinel incidents --user root --limit 5 --json
+
+sentinel incident 3                               # summary, kill chain, timeline
+sentinel incident 3 --graph                       # also print the Mermaid graph source
+sentinel incident 3 --json                        # the incident as JSON
+sentinel incident 3 --triage                      # advisory LLM verdict (needs ai.llm.enabled)
+```
+
+| `sentinel incidents` option | Description                                              |
+|-----------------------------|----------------------------------------------------------|
+| `--limit <n>`               | Maximum incidents to list (default `20`)                 |
+| `--ip <ip>`                 | Only incidents involving this source IP                  |
+| `--user <user>`             | Only incidents involving this user                       |
+| `--min-level <level>`       | Only incidents at or above `low`, `medium`, `high` or `critical` |
+| `--json`                    | Print a JSON array instead of a table                    |
+
+| `sentinel incident <id>` option | Description                                          |
+|---------------------------------|------------------------------------------------------|
+| `--graph`                       | Print the Mermaid graph source (with `--json` it goes to stderr, so stdout stays valid JSON) |
+| `--json`                        | Print the incident as JSON instead of formatted text |
+| `--triage`                      | Run advisory LLM triage on the incident and store the result on it |
+
+An unknown incident id exits with code 1. With no stored incidents,
+`sentinel incidents` says so and exits with code 0.
+
+### Where incidents show up
+
+- **Scan summary:** a line `Incidents: N (highest: LEVEL score)` appears when at
+  least one incident was found.
+- **JSON report:** the `incidents` array (full incident objects), plus
+  `incidents_total` and `incidents_by_level` in `summary`.
+- **HTML report:** an "Incidents" section with one card per incident (score,
+  entities, stages, timeline table) and the **Mermaid graph source** in a
+  collapsed block. The report loads no external scripts, so it does not draw the
+  graph; paste the source into any Mermaid viewer.
+- The CSV report is per alert and has no incident columns.
+
+### Incident triage
+
+`sentinel incident <id> --triage` sends a synthetic alert built from the incident
+(title, summary, stages, up to 5 sample events from its alerts) through the same
+structured triage as [`sentinel explain`](#structured-llm-triage) and stores the
+verdict on the incident. It needs `ai.llm.enabled: true`; otherwise the command
+prints how to enable it and exits with code 1. The verdict is **advisory only**:
+it does not change the incident score, any alert score or any response. The same
+validation, prompt-injection handling and template fallback apply.
+
+### Configuration
+
+All keys live under `correlation` (see [`config.example.yaml`](config.example.yaml)):
+
+| Key              | Default        | Description                                              |
+|------------------|----------------|----------------------------------------------------------|
+| `enabled`        | `true`         | Correlate alerts into incidents after a scan             |
+| `window_seconds` | `3600`         | Maximum gap between two linked alerts; 1..604800         |
+| `link_by`        | `[ip, user]`   | Non-empty list of `ip`, `user`, `host`: what links alerts |
+| `min_alerts`     | `2`            | Alerts needed for an incident; 2..100                    |
+| `stage_bonus`    | `5.0`          | Score added per extra distinct stage; 0..25              |
+| `max_bonus`      | `20.0`         | Cap on the total stage bonus; 0..40                      |
+| `max_timeline`   | `200`          | Timeline entries kept per incident; 10..2000             |
+
+### Benchmark acceptance scenario
+
+`benchmarks/scenarios/incident_ssh_chain` is the acceptance test for this
+feature: one source brute-forces SSH (R001), logs in as root (R005), escalates
+(R012) and plants cron persistence (R040). It must produce **exactly one**
+incident whose timeline carries those four rules in that order and whose stages
+are Credential Access, Privilege Escalation, Persistence.
+`incident_benign_admin_session` is a benign session that must produce no alerts
+and no incident. Label keys: [labels.yaml format](#labelsyaml-format).
+
+### Limitations
+
+- Linking by user can merge unrelated activity of a shared account such as
+  `root` when it falls within the window. Narrow `window_seconds` or remove
+  `user` from `link_by` if that is too coarse; the cost is missed chains.
+- Re-scanning the same log stores the incident again, like the alerts, so the
+  list can contain duplicates.
+- Titles and summaries are generated in English only; `ai.llm.language` does not
+  apply to them.
+- Incidents are built from the alerts of one scan run, so a chain split across
+  runs is not joined.
 
 ---
 

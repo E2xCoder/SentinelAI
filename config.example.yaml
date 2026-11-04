@@ -256,6 +256,24 @@ response:
   #   init_kwargs: {sudo_prefix: ["sudo", "-n"], ufw_binary: "ufw", timeout_seconds: 15}
 
 # -----------------------------------------------------------------------------
+# Alert correlation (see README "Alert correlation and incidents")
+# -----------------------------------------------------------------------------
+# After a scan, alerts that share an IP/user/host within a time gap are grouped
+# into an incident. Incidents are ADVISORY: they never change alert scores or
+# automated response. Everything below is optional; defaults are shown.
+#
+# correlation:
+#   enabled: true
+#   window_seconds: 3600            # max gap between linked alerts; 1..604800
+#   link_by: ["ip", "user"]         # non-empty list of: ip, user, host
+#                                   # (user can merge unrelated activity of a
+#                                   # shared account such as root)
+#   min_alerts: 2                   # 2..100; a lone alert is not an incident
+#   stage_bonus: 5.0                # score per extra distinct kill-chain stage; 0..25
+#   max_bonus: 20.0                 # cap on the total stage bonus; 0..40
+#   max_timeline: 200               # timeline entries kept per incident; 10..2000
+
+# -----------------------------------------------------------------------------
 # Reporting
 # -----------------------------------------------------------------------------
 report:
