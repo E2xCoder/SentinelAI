@@ -78,7 +78,7 @@ _PORT = r"(?P<port>\d{1,5})"
 
 _SSHD_PATTERNS: list[tuple[Pattern[str], Builder]] = [
     (
-        re.compile(rf"Failed (?:password|publickey|keyboard-interactive\S*) for invalid user {_USER} from {_IP}(?: port {_PORT})?"),
+        re.compile(rf"Failed (?:password|publickey|keyboard-interactive\S*) for invalid user\s+{_USER} from {_IP}(?: port {_PORT})?"),
         _c(EventType.AUTH_FAILURE, EventCategory.AUTHENTICATION, Severity.WARNING),
     ),
     (
@@ -90,11 +90,11 @@ _SSHD_PATTERNS: list[tuple[Pattern[str], Builder]] = [
         _c(EventType.AUTH_SUCCESS, EventCategory.AUTHENTICATION, Severity.INFO, method="method"),
     ),
     (
-        re.compile(rf"Invalid user {_USER} from {_IP}(?: port {_PORT})?"),
+        re.compile(rf"Invalid user\s+{_USER} from {_IP}(?: port {_PORT})?"),
         _c(EventType.INVALID_USER, EventCategory.AUTHENTICATION, Severity.WARNING),
     ),
     (
-        re.compile(rf"error: maximum authentication attempts exceeded for(?: invalid user)? {_USER} from {_IP}(?: port {_PORT})?"),
+        re.compile(rf"error: maximum authentication attempts exceeded for(?: invalid user)?\s+{_USER} from {_IP}(?: port {_PORT})?"),
         _c(EventType.AUTH_FAILURE, EventCategory.AUTHENTICATION, Severity.ERROR),
     ),
     (

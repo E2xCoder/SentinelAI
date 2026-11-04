@@ -168,16 +168,16 @@
   },
   "risk": {
     "attack": {
-      "alerts": 32,
+      "alerts": 33,
       "by_level": {
         "critical": 0,
-        "high": 4,
+        "high": 5,
         "informational": 2,
         "low": 8,
         "medium": 18
       },
       "max": 70.0,
-      "mean": 44.17,
+      "mean": 44.84,
       "min": 12.0
     },
     "benign": {
@@ -196,13 +196,13 @@
   },
   "rules": {
     "R001": {
-      "attack_scenarios": 2,
+      "attack_scenarios": 3,
       "fn": 0,
       "fp": 0,
       "name": "SSH Brute Force",
       "precision": 1.0,
       "recall": 1.0,
-      "tp": 2
+      "tp": 3
     },
     "R002": {
       "attack_scenarios": 1,
@@ -1377,20 +1377,54 @@
       "passed": true,
       "risk_ok": true,
       "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "high",
+          "risk_score": 66.44,
+          "rule_id": "R001"
+        }
+      ],
+      "events": 6,
+      "expected_rules": [
+        "R001"
+      ],
+      "fired_rules": [
+        "R001"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "rw_legacy_sshd_pam_bruteforce",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 16,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "rw_sshd_pam_triplet_not_double_counted",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
     }
   ],
   "schema_version": 1,
   "sentinelai_version": "0.1.0",
   "summary": {
     "attack_recall": 1.0,
-    "attack_scenarios": 28,
+    "attack_scenarios": 29,
     "benign_alerts": 0,
-    "benign_events": 219,
-    "benign_scenarios": 27,
+    "benign_events": 235,
+    "benign_scenarios": 28,
     "fp_per_1k_benign_events": 0.0,
     "precision": 1.0,
-    "scenarios_passed": 55,
-    "scenarios_total": 55,
+    "scenarios_passed": 57,
+    "scenarios_total": 57,
     "uncovered_rules": []
   }
 }

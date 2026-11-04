@@ -19,7 +19,7 @@ import re
 
 from sentinelai.core.models import EventCategory, EventType, LogEvent, Severity
 from sentinelai.parsers.base import LogParser, register_parser
-from sentinelai.utils.timeparse import parse_iso_timestamp, parse_syslog_timestamp
+from sentinelai.utils.timeparse import SyslogYearTracker, parse_iso_timestamp
 
 _HEADER = re.compile(
     r"^(?P<ts>[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}|"
@@ -46,6 +46,12 @@ _ACTION_EVENT = {
 class UFWParser(LogParser):
     """UFW (netfilter) log parser."""
 
+    def __init__(self) -> None:
+        self._years = SyslogYearTracker()
+
+    def reset_stream_state(self) -> None:
+        self._years.reset()
+
     name = "ufw"
     description = "UFW firewall log (kernel netfilter messages)"
     filename_hints = ("ufw",)
@@ -63,7 +69,7 @@ class UFWParser(LogParser):
         ts_raw = match.group("ts")
         timestamp = (
             parse_iso_timestamp(ts_raw.replace(",", "."))
-            or parse_syslog_timestamp(ts_raw)
+            or self._years.resolve(ts_raw)
         )
         if timestamp is None:
             return None

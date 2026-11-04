@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # "Jan  7 03:14:15" — classic BSD syslog, no year.
 _SYSLOG_BSD = re.compile(
@@ -46,6 +46,58 @@ def parse_syslog_timestamp(value: str, reference_year: int | None = None) -> dat
     if reference_year is None and result > now:
         result = result.replace(year=year - 1)
     return result
+
+
+class SyslogYearTracker:
+    """Infer the missing year of BSD syslog timestamps across ONE log stream.
+
+    Per-line inference (``parse_syslog_timestamp``) cannot tell December from
+    the following January, so a log that crosses New Year (or is older than a
+    year) would jump back and forth in time. The tracker anchors the first
+    line like ``parse_syslog_timestamp`` does, then follows the stream: when a
+    line is more than half a year *earlier* than the previous one the year
+    rolled over, and when it is more than half a year *later* it is a stray
+    older line. Small out-of-order jitter is tolerated.
+    """
+
+    _HALF_YEAR = timedelta(days=183)
+
+    def __init__(self) -> None:
+        self._last: datetime | None = None
+
+    def reset(self) -> None:
+        self._last = None
+
+    def resolve(self, value: str) -> datetime | None:
+        match = _SYSLOG_BSD.match(value.strip())
+        if not match:
+            return None
+        if self._last is None:
+            first = parse_syslog_timestamp(value)
+            self._last = first
+            return first
+        hour, minute, second = (int(p) for p in match.group("time").split(":"))
+        month, day = _MONTHS[match.group("mon")], int(match.group("day"))
+        year = self._last.year
+        result = _safe_datetime(year, month, day, hour, minute, second)
+        if result is None:
+            return None
+        if result < self._last - self._HALF_YEAR:
+            result = _safe_datetime(year + 1, month, day, hour, minute, second) or result
+        elif result > self._last + self._HALF_YEAR:
+            result = _safe_datetime(year - 1, month, day, hour, minute, second) or result
+        if result > self._last or result < self._last - self._HALF_YEAR:
+            self._last = result
+        return result
+
+
+def _safe_datetime(
+    year: int, month: int, day: int, hour: int, minute: int, second: int
+) -> datetime | None:
+    try:
+        return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 _FRACTION = re.compile(r"\.(\d+)")

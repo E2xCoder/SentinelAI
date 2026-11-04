@@ -42,3 +42,6 @@ sentinelai.env
 *.env
 .env
 !deploy/sentinelai.env.example
+
+# raw real-world logs never get committed
+local-logs/

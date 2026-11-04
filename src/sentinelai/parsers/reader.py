@@ -133,4 +133,5 @@ def read_events(
     resolved = resolve_input_file(path)
     active = parser or resolve_parser(resolved, parser_name, limits)
     _LOGGER.debug("Reading %s with parser %s", resolved, active.name)
+    active.reset_stream_state()
     yield from active.parse_lines(stream_lines(resolved, limits), source=str(resolved))

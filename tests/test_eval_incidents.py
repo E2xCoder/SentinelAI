@@ -352,11 +352,12 @@ class TestScenariosWithoutIncidentExpectations:
 def baseline_scenarios() -> dict[str, dict[str, Any]]:
     data = json.loads(BASELINE.read_text(encoding="utf-8"))
     # The Phase 6 incident scenarios (names start with "incident_") carry incident keys on purpose;
-    # this guard is about the 53 scenarios that existed before them.
+    # this guard is about the 53 scenarios that existed before them. The "rw_" scenarios are
+    # anonymized regressions from the real-world validation and are also added later.
     return {
         entry["name"]: entry
         for entry in data["scenarios"]
-        if not entry["name"].startswith("incident_")
+        if not entry["name"].startswith(("incident_", "rw_"))
     }
 
 

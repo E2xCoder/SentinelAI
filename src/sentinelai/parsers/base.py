@@ -46,6 +46,9 @@ class LogParser(ABC):
     def parse_line(self, line: str) -> LogEvent | None:
         """Parse a single line into a :class:`LogEvent`, or ``None``."""
 
+    def reset_stream_state(self) -> None:  # noqa: B027 - optional hook
+        """Forget per-stream state (e.g. year inference); called before each file."""
+
     def parse_lines(self, lines: Iterable[str], source: str = "") -> Iterator[LogEvent]:
         """Parse an iterable of lines, skipping malformed ones safely."""
         for line in lines:

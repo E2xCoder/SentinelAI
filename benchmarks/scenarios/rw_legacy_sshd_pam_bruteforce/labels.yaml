@@ -1,0 +1,9 @@
+name: rw_legacy_sshd_pam_bruteforce
+kind: attack
+description: Old sshd logs failures only as a pam_unix authentication failure line under sshd(pam_unix); six from one source must trigger SSH brute force. Anonymized from Loghub Linux.
+files: [auth.log]
+expect:
+  rules: [R001]
+  min_risk_level: medium
+forbid:
+  rules: [R002, R003, R004, R006]

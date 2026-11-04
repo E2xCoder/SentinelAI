@@ -1,0 +1,4 @@
+name: rw_sshd_pam_triplet_not_double_counted
+kind: benign
+description: Four real failed logins that OpenSSH reports as Invalid user + PAM + Failed password (12+ lines); must stay below the 5-failure threshold. Anonymized from Loghub OpenSSH.
+files: [auth.log]

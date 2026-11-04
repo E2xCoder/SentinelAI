@@ -312,7 +312,8 @@ class SuspiciousLoginHoursRule(Rule):
             title=f"Off-hours login for '{event.user or 'unknown'}'",
             description=(
                 f"Successful login for '{event.user or 'unknown'}' at "
-                f"{event.timestamp:%H:%M} UTC, inside the configured quiet "
+                f"{event.timestamp:%H:%M} (log time; logs without a timezone are read as UTC), "
+                f"inside the configured quiet "
                 f"window {start:02d}:00-{end:02d}:59."
             ),
             login_hour=hour,
