@@ -98,7 +98,13 @@ def default_gateways() -> set[str]:
     try:
         with open(_ROUTE_FILE, encoding="ascii", errors="replace") as handle:
             lines = handle.read().splitlines()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _LOGGER.warning(
+            "Cannot read %s (%s); default-gateway protection is OFF. "
+            "Set response.admin_ranges to protect your gateway explicitly.",
+            _ROUTE_FILE,
+            type(exc).__name__,
+        )
         return set()
     for line in lines[1:]:
         fields = line.split()

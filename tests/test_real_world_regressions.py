@@ -6,6 +6,9 @@ All lines are anonymized (documentation IPs, generic hosts and users).
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
 
 from sentinelai.core.models import EventType
 from sentinelai.parsers.base import get_parser
@@ -136,3 +139,17 @@ def test_store_batch_defers_commits_but_persists_everything(tmp_path) -> None:  
     assert other.execute("SELECT COUNT(*) FROM alerts").fetchone()[0] == 5
     other.close()
     store.close()
+
+
+def test_unreadable_route_file_warns_instead_of_failing_silently(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    import sys
+
+    from sentinelai.firewall import lockout
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(lockout, "_ROUTE_FILE", str(tmp_path / "missing-route"))
+    with caplog.at_level("WARNING"):
+        assert lockout.default_gateways() == set()
+    assert "gateway protection is OFF" in caplog.text
