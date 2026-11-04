@@ -179,10 +179,11 @@ class AnalysisPipeline:
         stats = ScanStatistics()
         alerts: list[Alert] = []
         buffer: deque[LogEvent] = deque(maxlen=_AI_BUFFER_LIMIT)
-        for event in events:
-            stats.observe(event)
-            buffer.append(event)
-            alerts.extend(self.process_event(event))
+        with self.store.batch():
+            for event in events:
+                stats.observe(event)
+                buffer.append(event)
+                alerts.extend(self.process_event(event))
 
         anomaly_count = 0
         ai_used = False

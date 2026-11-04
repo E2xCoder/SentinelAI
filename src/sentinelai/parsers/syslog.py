@@ -155,7 +155,8 @@ class SyslogParser(LogParser):
         ts_raw = match.group("ts")
         timestamp = (
             parse_iso_timestamp(ts_raw.replace(",", "."))
-            or self._years.resolve(ts_raw)
+            if ts_raw[:1].isdigit()
+            else self._years.resolve(ts_raw)
         )
         if timestamp is None:
             return None

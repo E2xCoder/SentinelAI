@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -223,6 +224,8 @@ class AlertStore:
     def __init__(self, db_path: str | Path) -> None:
         try:
             self._conn = sqlite3.connect(str(db_path))
+            self._batch_depth = 0
+            self._pending = 0
             self._migrate()
         except sqlite3.Error as exc:
             raise StorageError(f"Cannot open alert database {db_path}: {exc}") from exc
@@ -266,6 +269,35 @@ class AlertStore:
             self._conn.rollback()
             raise
 
+    #: Writes grouped into one commit while a :meth:`batch` is open.
+    _BATCH_SIZE = 200
+
+    @contextmanager
+    def batch(self) -> Iterator[None]:
+        """Group :meth:`save`/:meth:`update` writes into few commits.
+
+        One fsync per alert dominates a large scan, so scans open a batch.
+        Everything is committed when the batch closes (also on error), and
+        every other store method still commits immediately, which flushes
+        the pending writes with it.
+        """
+        self._batch_depth += 1
+        try:
+            yield
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0:
+                self._pending = 0
+                self._conn.commit()
+
+    def _commit_write(self) -> None:
+        if self._batch_depth:
+            self._pending += 1
+            if self._pending < self._BATCH_SIZE:
+                return
+            self._pending = 0
+        self._conn.commit()
+
     def save(self, alert: Alert) -> int:
         """Persist *alert*, assigning and returning its integer id."""
         try:
@@ -291,7 +323,7 @@ class AlertStore:
                     json.dumps(alert.to_dict(include_events=True)),
                 ),
             )
-            self._conn.commit()
+            self._commit_write()
         except sqlite3.Error as exc:
             raise StorageError(f"Failed to persist alert: {exc}") from exc
         alert.id = int(cursor.lastrowid or 0)
@@ -313,7 +345,7 @@ class AlertStore:
                     alert.id,
                 ),
             )
-            self._conn.commit()
+            self._commit_write()
         except sqlite3.Error as exc:
             raise StorageError(f"Failed to update alert #{alert.id}: {exc}") from exc
 

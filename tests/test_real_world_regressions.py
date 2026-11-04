@@ -115,3 +115,24 @@ def test_tracker_reset_forgets_previous_stream() -> None:
     now = datetime.now(timezone.utc)
     resolved = tracker.resolve("Jan  1 00:00:00")
     assert resolved is not None and resolved <= now
+
+
+def test_store_batch_defers_commits_but_persists_everything(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import sqlite3
+
+    from sentinelai.core.store import AlertStore
+    from tests.test_response_hardening import make_alert
+
+    db = tmp_path / "alerts.db"
+    store = AlertStore(db)
+    with store.batch():
+        for _ in range(5):
+            store.save(make_alert("203.0.113.9", alert_id=None))
+        # not yet visible to another connection: the commit is deferred
+        other = sqlite3.connect(str(db))
+        assert other.execute("SELECT COUNT(*) FROM alerts").fetchone()[0] == 0
+        other.close()
+    other = sqlite3.connect(str(db))
+    assert other.execute("SELECT COUNT(*) FROM alerts").fetchone()[0] == 5
+    other.close()
+    store.close()

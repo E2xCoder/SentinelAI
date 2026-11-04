@@ -61,11 +61,11 @@ class SlidingWindowStore:
 
     def distinct(self, key: str, now: datetime, window_seconds: int, field: str) -> set[Any]:
         """Distinct payload values of *field* within the window."""
-        return {
-            entry.payload.get(field)
-            for entry in self.entries(key, now, window_seconds)
-            if entry.payload.get(field) is not None
-        }
+        self.prune(key, now, window_seconds)
+        window = self._windows.get(key)
+        if not window:
+            return set()
+        return {v for e in window if (v := e.payload.get(field)) is not None}
 
     def span_seconds(self, key: str, now: datetime, window_seconds: int) -> float:
         """Seconds between oldest and newest in-window entries."""

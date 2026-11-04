@@ -76,7 +76,8 @@ class SyslogYearTracker:
             first = parse_syslog_timestamp(value)
             self._last = first
             return first
-        hour, minute, second = (int(p) for p in match.group("time").split(":"))
+        clock = match.group("time")
+        hour, minute, second = int(clock[0:2]), int(clock[3:5]), int(clock[6:8])
         month, day = _MONTHS[match.group("mon")], int(match.group("day"))
         year = self._last.year
         result = _safe_datetime(year, month, day, hour, minute, second)
