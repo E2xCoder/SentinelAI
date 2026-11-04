@@ -100,7 +100,7 @@ class _SigmaLoader(yaml.SafeLoader):
     """SafeLoader that refuses aliases (expansion bombs) and duplicate mapping keys."""
 
     def compose_node(self, parent: Any, index: Any) -> Any:
-        if self.check_event(yaml.AliasEvent):  # type: ignore[no-untyped-call]
+        if self.check_event(yaml.AliasEvent):  # type: ignore[no-untyped-call, unused-ignore]
             raise _SigmaYamlError("YAML aliases are not supported")
         return super().compose_node(parent, index)
 
@@ -122,10 +122,10 @@ _SigmaLoader.add_constructor("tag:yaml.org,2002:int", _construct_int)
 def _iter_documents(text: str) -> Iterator[object]:
     loader = _SigmaLoader(text)
     try:
-        while loader.check_data():  # type: ignore[no-untyped-call]
-            yield loader.get_data()  # type: ignore[no-untyped-call]
+        while loader.check_data():  # type: ignore[no-untyped-call, unused-ignore]
+            yield loader.get_data()  # type: ignore[no-untyped-call, unused-ignore]
     finally:
-        loader.dispose()  # type: ignore[no-untyped-call]
+        loader.dispose()  # type: ignore[no-untyped-call, unused-ignore]
 
 
 class SigmaRule(Rule):
