@@ -1,0 +1,3 @@
+2026-01-07T10:00:01+00:00 app01 sudo[5101]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T10:04:12+00:00 app01 sudo[5110]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow
+2026-01-07T10:04:40+00:00 app01 sudo[5111]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/cp /etc/shadow /tmp/hashes.txt

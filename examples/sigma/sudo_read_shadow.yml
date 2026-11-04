@@ -1,0 +1,29 @@
+title: Sudo Used To Read Or Copy The Shadow Password File
+id: 5c2c3993-4e61-4165-90d2-15dc05e8d8e9
+status: experimental
+description: Detects a sudo command that reads, pages or copies /etc/shadow with a common file utility, which exposes password hashes for offline cracking.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.credential_access
+  - attack.t1003.008
+logsource:
+  product: linux
+  category: process_creation
+  service: sudo
+detection:
+  selection_target:
+    CommandLine|contains: '/etc/shadow'
+  selection_tool:
+    CommandLine|contains:
+      - 'cat '
+      - 'less '
+      - 'head '
+      - 'tail '
+      - 'cp '
+  condition: selection_target and selection_tool
+falsepositives:
+  - Administrators auditing account password ageing
+  - Backup scripts that copy /etc/shadow
+level: high

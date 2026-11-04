@@ -1,0 +1,24 @@
+title: All Cron Jobs Of A User Removed With crontab -r
+id: 9a632d2b-e904-4718-a293-dba50a0d64ce
+status: experimental
+description: Detects crontab -r, which deletes every scheduled job of a user without confirmation. Attackers use it to remove monitoring or backup jobs, and it is also an easy typo for crontab -e.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.impact
+  - attack.t1489
+  - attack.defense_evasion
+  - attack.t1070
+logsource:
+  product: linux
+  category: process_creation
+detection:
+  selection:
+    CommandLine|contains|all:
+      - 'crontab'
+      - ' -r'
+  condition: selection
+falsepositives:
+  - Administrators intentionally retiring an account's scheduled jobs
+level: medium

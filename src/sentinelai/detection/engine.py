@@ -7,7 +7,7 @@ spans thousands of log lines produces one evolving alert, not thousands.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 
 from sentinelai.config.models import DetectionConfig
@@ -31,10 +31,11 @@ class RuleEngine:
         self,
         config: DetectionConfig,
         now: Callable[[], datetime] | None = None,
+        extra_rules: Sequence[Rule] | None = None,
     ) -> None:
         self._config = config
         self._ctx = RuleContext(config)
-        self._rules = self._load_rules(config)
+        self._rules = self._load_rules(config, extra_rules)
         self._recent: dict[str, tuple[Alert, datetime]] = {}
         clock = now if now is not None else _utc_now
         self._suppressor = SuppressionMatcher(config.parsed_suppressions(), clock)
@@ -52,16 +53,31 @@ class RuleEngine:
         return dict(self._suppressed_by_rule)
 
     @staticmethod
-    def _load_rules(config: DetectionConfig) -> list[Rule]:
+    def _load_rules(
+        config: DetectionConfig,
+        extra_rules: Sequence[Rule] | None = None,
+    ) -> list[Rule]:
         enabled = set(config.enabled_rules)
         disabled = set(config.disabled_rules)
         loaded: list[Rule] = []
+        seen: set[str] = set()
         for rule_id, cls in sorted(available_rules().items()):
+            seen.add(rule_id)
             if enabled and rule_id not in enabled:
                 continue
             if rule_id in disabled:
                 continue
             loaded.append(cls())
+        for extra in sorted(extra_rules or (), key=lambda rule: rule.rule_id):
+            if extra.rule_id in seen:
+                _LOGGER.warning("Skipping extra rule with duplicate id %s", extra.rule_id)
+                continue
+            seen.add(extra.rule_id)
+            if enabled and extra.rule_id not in enabled:
+                continue
+            if extra.rule_id in disabled:
+                continue
+            loaded.append(extra)
         _LOGGER.debug("Loaded %d detection rules", len(loaded))
         return loaded
 

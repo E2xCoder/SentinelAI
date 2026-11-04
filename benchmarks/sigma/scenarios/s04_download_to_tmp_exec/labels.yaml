@@ -1,0 +1,6 @@
+name: s04_download_to_tmp_exec
+kind: attack
+description: A sudo shell downloads a binary into /tmp, makes it executable and runs it.
+files: [auth.log]
+expect:
+  rules: [SIGMA-b6f30a0a]

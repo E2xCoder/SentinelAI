@@ -1,0 +1,36 @@
+title: File Downloaded Into A Temporary Directory And Made Executable
+id: b6f30a0a-1679-42c8-bb64-650eda3ac16e
+status: experimental
+description: Detects a single command that downloads a file with wget or curl into /tmp, /var/tmp or /dev/shm and marks it executable, the usual drop-and-run staging step.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.execution
+  - attack.t1059.004
+  - attack.command_and_control
+  - attack.t1105
+logsource:
+  product: linux
+  category: process_creation
+detection:
+  selection_download:
+    CommandLine|contains:
+      - 'wget '
+      - 'curl '
+  selection_staging:
+    CommandLine|contains:
+      - '/tmp/'
+      - '/var/tmp/'
+      - '/dev/shm/'
+  selection_chmod:
+    CommandLine|contains:
+      - 'chmod +x'
+      - 'chmod u+x'
+      - 'chmod a+x'
+      - 'chmod 755'
+      - 'chmod 777'
+  condition: selection_download and selection_staging and selection_chmod
+falsepositives:
+  - Build or CI jobs that fetch helper binaries into a scratch directory
+level: high

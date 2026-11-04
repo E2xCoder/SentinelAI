@@ -17,6 +17,7 @@ the *how* to the firewall boundary. Safety rails:
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -42,6 +43,11 @@ _MAX_DETAIL_LEN = 200
 _AUDIT_SKIP_MAP_LIMIT = 5000
 _UNTRACKED_REASON = "could not record the block; refusing to apply an untracked block"
 _BREAKER_UNREADABLE = "could not read the block history; refusing to block"
+_SIGMA_RULE_ID_RE = re.compile(r"SIGMA-[0-9a-f]{8}")
+_SIGMA_SKIP_REASON = (
+    "alerts from imported Sigma rules do not trigger automatic blocking "
+    "(response.include_sigma_rules is false)"
+)
 
 
 def _utc_now() -> datetime:
@@ -314,6 +320,12 @@ class AutoResponder:
             )
         if ip is None:
             return self._skip(alert, self._audit_ip(alert.ip), "no valid source IP")
+        if (
+            self._config.mode == "auto"
+            and not self._config.include_sigma_rules
+            and _SIGMA_RULE_ID_RE.fullmatch(alert.rule_id or "") is not None
+        ):
+            return self._skip(alert, ip, _SIGMA_SKIP_REASON)
         unblockable = blockable_reason(ip)
         if unblockable is not None:
             return self._skip(alert, ip, unblockable)

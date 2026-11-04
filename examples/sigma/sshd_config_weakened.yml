@@ -1,0 +1,27 @@
+title: SSH Daemon Configuration Weakened From The Command Line
+id: 66d96c74-e5e0-42f4-9526-cc78ddd170f4
+status: experimental
+description: Detects sed or echo commands that enable root login, password login or empty passwords in sshd_config, weakening SSH authentication.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.persistence
+  - attack.defense_evasion
+  - attack.t1562.001
+  - attack.t1098
+logsource:
+  product: linux
+  category: process_creation
+detection:
+  selection_file:
+    CommandLine|contains: 'sshd_config'
+  selection_weak:
+    CommandLine|contains:
+      - 'PermitRootLogin yes'
+      - 'PasswordAuthentication yes'
+      - 'PermitEmptyPasswords yes'
+  condition: selection_file and selection_weak
+falsepositives:
+  - Short-lived lab or migration changes that are reverted afterwards
+level: high

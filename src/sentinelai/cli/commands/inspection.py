@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 from rich.table import Table
@@ -12,6 +14,10 @@ from sentinelai import __version__
 from sentinelai.cli import console as ui
 from sentinelai.cli.common import build_pipeline, fail, load_context
 from sentinelai.core.exceptions import SentinelError
+
+if TYPE_CHECKING:
+    from sentinelai.detection.base import Rule
+    from sentinelai.sigma import LoadReport
 
 
 @click.command()
@@ -137,9 +143,65 @@ def search(
     ui.console.print(f"[dim]Showing {shown} of {total} matching events.[/dim]")
 
 
-@click.command(name="rules")
-def rules_cmd() -> None:
-    """List available detection rules."""
+_LICENSE_NOTE = (
+    "Sigma rules are community content under their own licenses (SigmaHQ: Detection Rule "
+    "License 1.1, the author must be credited). SentinelAI shows the author in the alert."
+)
+
+
+def _sigma_rules_table(rules: Sequence[Rule], title: str) -> Table:
+    table = Table(title=title, header_style="bold")
+    table.add_column("ID")
+    table.add_column("Name")
+    table.add_column("Level")
+    table.add_column("MITRE")
+    table.add_column("Author")
+    for rule in rules:
+        table.add_row(
+            ui._safe(rule.rule_id),
+            ui._safe(rule.name),
+            ui._safe(rule.severity.value),
+            ui._safe(", ".join(rule.mitre_techniques) or "-"),
+            ui._safe(getattr(rule, "author", "") or "-"),
+        )
+    return table
+
+
+def _print_loaded_sigma(ctx: click.Context) -> None:
+    """List loaded Sigma rules when enabled in the config; never fails the command."""
+    context = ctx.obj
+    config = getattr(context, "config", None)
+    sigma = getattr(config, "sigma", None)
+    if sigma is None or not sigma.enabled:
+        return
+    from sentinelai.sigma import load_rules
+
+    try:
+        loaded = load_rules(
+            Path(sigma.rules_dir).expanduser(),
+            max_rules=sigma.max_rules,
+            max_file_bytes=sigma.max_file_kb * 1024,
+        )
+    except (SentinelError, OSError, ValueError) as exc:
+        ui.error_console.print(f"[yellow]Sigma rules not loaded:[/yellow] {ui._safe(exc)}")
+        return
+    if loaded.rules:
+        ui.console.print(_sigma_rules_table(loaded.rules, "Sigma rules"))
+    if loaded.unsupported:
+        ui.console.print(f"[dim]{len(loaded.unsupported)} Sigma rule(s) unsupported.[/dim]")
+
+
+@click.group(name="rules", invoke_without_command=True)
+@click.pass_context
+def rules_cmd(ctx: click.Context) -> None:
+    """List available detection rules (and import Sigma rules)."""
+    if ctx.invoked_subcommand is not None:
+        return
+    _print_builtin_rules()
+    _print_loaded_sigma(ctx)
+
+
+def _print_builtin_rules() -> None:
     from sentinelai.detection.base import available_rules
 
     table = Table(title="Detection Rules", header_style="bold")
@@ -157,6 +219,103 @@ def rules_cmd() -> None:
             ", ".join(cls.mitre_techniques) or "-",
         )
     ui.console.print(table)
+
+
+def _import_json(loaded: LoadReport) -> str:
+    data = {
+        "files_scanned": loaded.files_scanned,
+        "imported": [
+            {
+                "id": r.rule_id,
+                "level": r.severity.value,
+                "title": r.name,
+                "logsource": r.logsource_text,
+                "mitre_techniques": list(r.mitre_techniques),
+                "author": r.author,
+                "source_file": str(r.source_file),
+            }
+            for r in loaded.rules
+        ],
+        "unsupported": [
+            {"file": str(u.path), "title": u.title, "reason": u.reason}
+            for u in loaded.unsupported
+        ],
+    }
+    return json.dumps(data, indent=2, sort_keys=True)
+
+
+def _print_import_tables(loaded: LoadReport) -> None:
+    if loaded.rules:
+        table = Table(title=f"Imported rules ({len(loaded.rules)})", header_style="bold")
+        for col in ("ID", "Level", "Title", "Logsource", "ATT&CK", "Author", "File"):
+            table.add_column(col)
+        for r in loaded.rules:
+            table.add_row(
+                ui._safe(r.rule_id),
+                ui._safe(r.severity.value),
+                ui._safe(r.name),
+                ui._safe(r.logsource_text or "-"),
+                ui._safe(", ".join(r.mitre_techniques) or "-"),
+                ui._safe(r.author or "-"),
+                ui._safe(r.source_file),
+            )
+        ui.console.print(table)
+    if loaded.unsupported:
+        skipped = Table(
+            title=f"Unsupported rules ({len(loaded.unsupported)})", header_style="bold"
+        )
+        for col in ("File", "Title", "Reason"):
+            skipped.add_column(col)
+        for u in loaded.unsupported:
+            skipped.add_row(ui._safe(u.path), ui._safe(u.title or "-"), ui._safe(u.reason))
+        ui.console.print(skipped)
+
+
+@rules_cmd.command(name="import")
+@click.argument("directory", type=click.Path(path_type=Path))
+@click.option("--json", "as_json", is_flag=True, help="Print the dry-run result as JSON.")
+@click.option(
+    "--max-rules",
+    type=click.IntRange(1, 10000),
+    default=2000,
+    show_default=True,
+    help="Maximum number of rules to import.",
+)
+def rules_import_cmd(directory: Path, as_json: bool, max_rules: int) -> None:
+    """Dry-run: show which Sigma rules in DIRECTORY SentinelAI could import.
+
+    Nothing is written to disk; the config snippet to enable them is printed.
+    """
+    from sentinelai.sigma import load_rules
+
+    try:
+        if not directory.is_dir():
+            raise SentinelError(f"Not a directory: {directory}")
+        loaded = load_rules(directory, max_rules=max_rules)
+    except OSError as exc:
+        fail(SentinelError(f"Cannot read {directory}: {exc}"))
+    except SentinelError as exc:
+        fail(exc)
+
+    if as_json:
+        click.echo(_import_json(loaded))
+        return
+
+    ui.console.print(
+        f"[bold]Scanned {loaded.files_scanned} file(s):[/bold] "
+        f"{len(loaded.rules)} importable, {len(loaded.unsupported)} unsupported."
+    )
+    _print_import_tables(loaded)
+    if not loaded.rules:
+        ui.console.print("\n[bold yellow]No rules were importable[/bold yellow]")
+        return
+    ui.console.print("\n[bold]To enable, add this to config.yaml:[/bold]")
+    # json.dumps yields a quoted, escaped scalar, so a hostile directory name
+    # cannot inject extra YAML lines.
+    quoted_dir = json.dumps(str(directory.resolve()))
+    snippet = f"sigma:\n  enabled: true\n  rules_dir: {quoted_dir}"
+    ui.console.print(snippet, markup=False, highlight=False, soft_wrap=True)
+    ui.console.print(f"\n[dim]{_LICENSE_NOTE}[/dim]")
 
 
 @click.command(name="config")

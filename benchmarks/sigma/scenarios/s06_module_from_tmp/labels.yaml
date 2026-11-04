@@ -1,0 +1,6 @@
+name: s06_module_from_tmp
+kind: attack
+description: A kernel module is loaded with insmod and modprobe from /tmp and /dev/shm.
+files: [auth.log]
+expect:
+  rules: [SIGMA-3fc10c9f]

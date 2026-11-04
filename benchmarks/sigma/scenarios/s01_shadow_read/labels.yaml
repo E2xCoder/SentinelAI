@@ -1,0 +1,6 @@
+name: s01_shadow_read
+kind: attack
+description: An operator reads and copies /etc/shadow through sudo.
+files: [auth.log]
+expect:
+  rules: [SIGMA-5c2c3993]

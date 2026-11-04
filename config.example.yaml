@@ -274,6 +274,25 @@ response:
 #   max_timeline: 200               # timeline entries kept per incident; 10..2000
 
 # -----------------------------------------------------------------------------
+# Sigma rule import (see README "Sigma rule import") — OFF by default
+# -----------------------------------------------------------------------------
+# Loads a safe, minimal SUBSET of Sigma rules (not a full Sigma engine, no
+# pySigma) as extra detection rules with ids SIGMA-<8 hex>. Run
+# `sentinel rules import <dir>` first: it lists what is usable and why other
+# rules are unsupported. Sigma files are untrusted input and are never executed.
+# SentinelAI does not bundle SigmaHQ rules (Detection Rule License 1.1); alerts
+# carry the rule author and a license notice. Community rules can be noisy:
+# try them with `sentinel scan` on your own logs first.
+# Environment: SENTINELAI_SIGMA_ENABLED, SENTINELAI_SIGMA_RULES_DIR,
+# SENTINELAI_SIGMA_MAX_RULES, SENTINELAI_SIGMA_MAX_FILE_KB.
+#
+# sigma:
+#   enabled: false
+#   rules_dir: ""                   # required when enabled, e.g. "~/sigma/rules/linux"
+#   max_rules: 2000                 # 1..10000
+#   max_file_kb: 256                # largest rule file read; 1..4096
+
+# -----------------------------------------------------------------------------
 # Reporting
 # -----------------------------------------------------------------------------
 report:

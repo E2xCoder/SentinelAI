@@ -39,6 +39,33 @@ While the version is 0.x, minor releases may contain breaking changes.
 - Known limitations: linking by user can merge unrelated activity of a shared
   account such as `root` within the window; re-scanning the same log stores the
   incident again, like alerts; incident summaries are English only.
+- **Sigma rule import** (`sigma` package, off by default). Loads a safe, minimal
+  subset of Sigma rules from a directory and runs them as extra detection rules
+  with ids `SIGMA-<first 8 hex of the Sigma UUID>`. Not a full Sigma engine, no
+  pySigma. Supported: Linux logsources (services `auth`, `secure`, `sudo`, `su`,
+  `sshd`, `cron`, `syslog`, `messages`, `daemon`, `kern`, `docker`, `nginx`,
+  `apache`, `fail2ban`, `ufw`; categories `process_creation`, `webserver`,
+  `firewall`), selections and keyword lists, modifiers `contains`, `startswith`,
+  `endswith`, `all`, `cidr`, `exists`, `*`/`?` wildcards, and the condition
+  grammar `and`/`or`/`not`/parentheses/`1 of`/`all of`. Everything else (`re`
+  and other modifiers, aggregations, `timeframe`, `N of` with N other than 1,
+  fields without a SentinelAI equivalent, non-Linux logsources, auditd,
+  journald) is reported as unsupported with a reason, never approximated.
+- `sentinel rules import <dir> [--json] [--max-rules N]`: dry run that lists
+  importable and unsupported rules and prints the config snippet. `sentinel
+  rules` also lists loaded Sigma rules when `sigma.enabled` is true.
+- `sigma` config section: `enabled`, `rules_dir`, `max_rules`, `max_file_kb`
+  (environment: `SENTINELAI_SIGMA_*`). Sigma ids are accepted in
+  `detection.suppressions`, `detection.enabled_rules`/`disabled_rules` and
+  `risk.rule_weights`; `sentinel tune` does not tune Sigma rules.
+- Licensing: SigmaHQ rules are not bundled (Detection Rule License 1.1). Every
+  Sigma alert carries the rule author, a license notice and the first reference
+  in its description and context.
+- `sentinel eval --sigma-rules <dir>` scores Sigma rules in the benchmark.
+  `examples/sigma/` (original rules, MIT) and a separate frozen benchmark root
+  `benchmarks/sigma/` with an attack and a benign look-alike scenario per rule.
+- Known limitation: Sigma rules evaluate only the first 8192 characters of each
+  event field.
 
 ## [0.1.0] - 2026-11-04
 

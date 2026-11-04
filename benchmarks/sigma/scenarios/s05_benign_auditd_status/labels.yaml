@@ -1,0 +1,4 @@
+name: s05_benign_auditd_status
+kind: benign
+description: An administrator only inspects auditd status and loaded audit rules.
+files: [auth.log]

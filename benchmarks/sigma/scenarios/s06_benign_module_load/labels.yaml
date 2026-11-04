@@ -1,0 +1,4 @@
+name: s06_benign_module_load
+kind: benign
+description: A distribution kernel module is loaded by name and listed.
+files: [auth.log]

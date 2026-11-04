@@ -23,6 +23,7 @@ firewall automation through a clean adapter boundary.
 - [Configuration](#configuration)
 - [CLI usage](#cli-usage)
 - [Detection rules](#detection-rules)
+- [Sigma rule import](#sigma-rule-import)
 - [Evaluation benchmark](#evaluation-benchmark)
 - [Feedback and tuning](#feedback-and-tuning)
 - [Threat detection example](#threat-detection-example)
@@ -53,6 +54,9 @@ firewall automation through a clean adapter boundary.
   root login, privilege escalation, reverse shells, suspicious cron, SSH-key
   tampering, firewall modification, container escapes, lateral movement, and
   more — each tagged with **MITRE ATT&CK** techniques.
+- **Sigma rule import** — optionally load community Sigma rules (a safe subset,
+  interpreted in-process) next to the built-in rules (see
+  [Sigma rule import](#sigma-rule-import)).
 - **Explained risk scoring** — every alert gets a 0–100 score with a per-factor
   breakdown of *why*.
 - **AI engine** — Isolation Forest anomaly detection, behavior profiling,
@@ -129,6 +133,7 @@ Packages (`src/sentinelai/`):
 | `monitor`    | Rotation-aware tailer, live monitor, replay                |
 | `reporting`  | Report builder + JSON/CSV/HTML renderers                   |
 | `correlation`| Alert-to-incident linking, kill-chain order, summaries     |
+| `sigma`      | Sigma subset parser, safe matcher, rule loader             |
 | `evaluation` | Frozen benchmark runner, metrics, baseline comparison      |
 | `tuning`     | Feedback-driven proposals, policy limits, gate, overlay    |
 | `search`     | Composable event query/filter engine                       |
@@ -257,7 +262,8 @@ sentinel config
 | `sentinel incidents`       | List stored incidents, highest risk first (see [Alert correlation and incidents](#alert-correlation-and-incidents)) |
 | `sentinel incident <id>`   | Show one incident: summary, kill chain, timeline (`--graph`, `--json`, `--triage`) |
 | `sentinel report <file>`   | Summarize a previously generated JSON report             |
-| `sentinel rules`           | List all detection rules with MITRE mappings             |
+| `sentinel rules`           | List all detection rules with MITRE mappings (plus loaded Sigma rules when `sigma.enabled`) |
+| `sentinel rules import <dir>` | Dry-run: show which Sigma rules in a directory can be imported and why others cannot (see [Sigma rule import](#sigma-rule-import)) |
 | `sentinel eval`            | Run the frozen detection benchmark (precision/recall)    |
 | `sentinel eval --triage`   | Also measure the configured LLM's triage (advisory only) |
 | `sentinel feedback <id>`   | Label a stored alert as true (`--tp`) or false (`--fp`) positive |
@@ -339,6 +345,242 @@ detection:
 
 ---
 
+## Sigma rule import
+
+[Sigma](https://github.com/SigmaHQ/sigma) is a community format for detection
+rules written as YAML. SentinelAI can load Sigma rules from a directory and run
+them next to the built-in rules. Imported rules raise normal alerts, with risk
+scoring, threat intelligence, correlation and reports.
+
+**Scope, honestly:** this is a safe, minimal subset of Sigma, evaluated
+in-process. It is not a full Sigma engine and does not use pySigma. A rule that
+uses anything outside the subset is not loaded, and `sentinel rules import`
+tells you why. Nothing is approximated silently. Community rules written for
+Windows, auditd or other telemetry SentinelAI does not have will therefore be
+reported as unsupported.
+
+Sigma is **off by default**.
+
+### Supported subset
+
+| Area | Supported |
+|------|-----------|
+| Document | Plain single-document rules. `title` is required; `level` defaults to `medium`. `id`, `author`, `description`, `references` and `tags` are used when present. |
+| Logsource `product` | Omitted or `linux` |
+| Logsource `service` | `auth`, `secure`, `sudo`, `su`, `sshd`, `cron`, `syslog`, `messages`, `daemon`, `kern`, `docker`, `nginx`, `apache`, `fail2ban`, `ufw` |
+| Logsource `category` | `process_creation`, `webserver`, `firewall` |
+| Selections | A mapping (fields are AND-ed), a list of mappings (OR-ed), or a keyword list (each string is a case-insensitive substring of the message or raw line) |
+| Values | A single value or a list (OR-ed). Null values and booleans are accepted. |
+| Modifiers | `contains`, `startswith`, `endswith`, `all`, `cidr`, `exists`; one value modifier per field, `all` only on text values |
+| Wildcards | `*` and `?` in values; `\*` and `\?` are literal characters |
+| Condition | `and`, `or`, `not`, parentheses, selection names, `1 of <pattern>`, `any of <pattern>`, `all of <pattern>`, `1 of them`, `all of them` |
+| Tags | `attack.tNNNN[.NNN]` become MITRE techniques, `attack.<tactic>` become tactics |
+
+Matching is case-insensitive. A `level` maps to a severity: `informational` to
+info, `low` to notice, `medium` to warning, `high` to error, `critical` to
+critical. The logsource is a gate: a rule with `service: sshd` only sees sshd
+events, and `category: process_creation` only sees events that carry a command
+(for example sudo commands and cron jobs).
+
+### Not supported
+
+Each of these makes the rule "unsupported", with the reason shown by
+`sentinel rules import`.
+
+| Not supported | Why |
+|---------------|-----|
+| `re` modifier | A regular expression built from rule data is a ReDoS risk. SentinelAI never feeds rule data to `re`. |
+| `base64`, `base64offset`, `windash`, `utf16`, `utf16le`, `utf16be`, `wide`, `fieldref`, `expand`, `gt`, `lt`, `gte`, `lte`, and any other modifier | Not implemented. Several need value transformation or numeric comparison. Combining two value modifiers is also rejected. |
+| Aggregations and `timeframe` (`count()`, `near`, anything after `\|` in the condition) | The matcher judges one event at a time and keeps no window state. |
+| `2 of`, `3 of` and other counts than `1` | Only `1 of`, `any of` and `all of` are implemented. |
+| Fields with no SentinelAI equivalent (for example `ParentImage`, `CurrentDirectory`) | The parsed event has no such data. See the field mapping below. |
+| Non-Linux logsources, services and categories outside the lists above | There is no parser and no event source for them. |
+| `auditd` and `journald` | SentinelAI has no parser for either, so no event would ever reach the rule. |
+| Collection (`action`), correlation and filter documents, several conditions in a list | Not part of the subset. |
+| Rules over the size caps (see below) | Rejected instead of truncated. |
+
+### Field mapping
+
+Sigma field names are matched case-insensitively and map to SentinelAI event
+data like this:
+
+| Sigma field | SentinelAI value |
+|-------------|------------------|
+| `CommandLine`, `Command`, `cmd` | The event's command (sudo or cron command line); the log message if it has none |
+| `Image`, `process.name`, `ProcessName` | The first word of the command, both as written and as its basename. No value if the event has no command. |
+| `User`, `TargetUser`, `AccountName` | The event's user |
+| `SourceIp`, `src_ip`, `IpAddress`, `ClientIp`, `c-ip` | The event's source IP |
+| `Computer`, `hostname`, `Host` | The event's hostname |
+| `message`, `msg` | The parsed log message |
+| `raw` | The full original log line |
+| `service`, `program` | The service or program name of the event |
+| `dst_port`, `DestinationPort`, `port` | The event's port, as text |
+| `request`, `cs-uri-query`, `url`, `path` | The request path of web events; the log message if there is none |
+| keyword list (no field) | The message and the raw line |
+
+Any other field makes the rule unsupported.
+
+### How it works
+
+Rules are **data**, not code. Each Sigma file is read with `yaml.safe_load_all`,
+validated, and compiled into a small immutable structure that a fixed, small
+evaluator interprets for every event.
+
+- No code generation, `eval` or `exec`, and no regular expression is ever built
+  from rule data.
+- Wildcards use an own iterative matcher. Its worst case is text length times
+  pattern length, both capped; there is no exponential backtracking.
+- Input is capped: only the first 8192 characters of each event field are
+  examined; a file is read only up to `sigma.max_file_kb`; a file holds at most
+  200 YAML documents; a value list has at most 1000 entries, a rule at most 100
+  selections and 5000 values in total, a value at most 4096 characters, a
+  condition at most 500 characters and 20 levels of nesting.
+- Directories are walked without following symlinks, and a file that resolves
+  outside the rules directory is skipped.
+- A rule that raises while matching is logged once and then ignored; it never
+  stops detection.
+
+Rule ids are `SIGMA-<first 8 hex characters of the Sigma UUID>`, for example
+`SIGMA-1a2b3c4d`. A rule without a valid UUID `id` gets the first 8 hex
+characters of the SHA-256 of its title instead. A second rule with the same id
+is reported as a duplicate and not loaded.
+
+### Commands
+
+```bash
+sentinel rules import path/to/sigma-rules          # dry run
+sentinel rules import path/to/sigma-rules --json   # same result as JSON
+sentinel rules                                     # built-in rules, plus loaded Sigma rules
+```
+
+`sentinel rules import <dir>` is a **dry run**. It writes nothing. It scans the
+directory recursively for `.yml` and `.yaml` files and prints:
+
+- a summary line (files scanned, importable, unsupported);
+- a table of importable rules (id, level, title, logsource, ATT&CK, author, file);
+- a table of unsupported rules with the reason for each;
+- the `sigma:` config snippet to add to `config.yaml`;
+- a license reminder.
+
+`--max-rules <n>` (default 2000) limits how many rules are imported. `--json`
+prints `files_scanned`, `imported` and `unsupported` instead of tables.
+
+`sentinel rules` lists the built-in rules; when `sigma.enabled` is true it adds a
+"Sigma rules" table (id, name, level, MITRE, author) and the number of
+unsupported rules.
+
+### Enabling it
+
+```yaml
+sigma:
+  enabled: true
+  rules_dir: /path/to/sigma-rules
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Load Sigma rules when the pipeline starts |
+| `rules_dir` | empty | Directory searched recursively; required when `enabled` is true; `~` is expanded |
+| `max_rules` | `2000` | Maximum rules loaded; 1..10000. Further rules are reported as "rule limit reached". |
+| `max_file_kb` | `256` | Largest rule file read, in KiB; 1..4096. Larger files are reported as too large. |
+
+Environment variables: `SENTINELAI_SIGMA_ENABLED`, `SENTINELAI_SIGMA_RULES_DIR`,
+`SENTINELAI_SIGMA_MAX_RULES`, `SENTINELAI_SIGMA_MAX_FILE_KB`.
+
+Rules are loaded once at start, so restart `sentinel live` after changing them.
+A missing or unreadable rules directory loads no rules and SentinelAI keeps
+running; the start-up log shows how many rules were loaded and how many were
+unsupported. `detection.enabled_rules` and `detection.disabled_rules`
+apply to Sigma ids as well; if `enabled_rules` is not empty, list the Sigma ids
+you want to run.
+
+### Licensing and attribution
+
+**SentinelAI does not bundle SigmaHQ rules.** They are published under the
+Detection Rule License (DRL) 1.1. As far as this project understands it, the DRL
+requires you to credit the rule author(s) and indicate the license when you
+share the rules, or when messages based on rule matches are produced. Read the
+license text in the SigmaHQ repository yourself; this is not legal advice.
+
+To make that practical, every Sigma alert carries the attribution:
+
+- the alert description ends with `Matched Sigma rule "<name>" by <author>.
+  Rule licensed under the Detection Rule License (DRL) 1.1 by its author(s) -
+  see references.`;
+- the alert context holds `sigma_id`, `sigma_author`, `sigma_license` and
+  `sigma_reference` (the first reference of the rule, if any).
+
+The license text is a fixed notice that assumes SigmaHQ rules; SentinelAI does
+not read a license from the rule file. For rules from another source, check that
+rule's own license.
+
+### Getting rules
+
+```bash
+git clone https://github.com/SigmaHQ/sigma
+sentinel rules import sigma/rules/linux     # see what is usable first
+```
+
+Then set `sigma.rules_dir` to that directory (the import output prints the
+snippet). Run the import before enabling: the report shows how many rules the
+subset covers and why the others were skipped.
+
+### Example pack
+
+`examples/sigma/` holds a small pack of original rules written for this project.
+They are not copied from SigmaHQ and are redistributed under the project's MIT
+license, so they can be used without the DRL obligations above.
+
+```bash
+sentinel rules import examples/sigma
+```
+
+### Measuring Sigma rules
+
+```bash
+sentinel eval --benchmarks benchmarks/sigma --sigma-rules examples/sigma
+```
+
+`benchmarks/sigma` is a separate frozen benchmark root with its own manifest and
+baseline, so it never changes `benchmarks/baseline.json`. It has an attack
+scenario and a benign look-alike scenario for each rule of the example pack.
+`--sigma-rules <dir>` loads that directory with the default caps and enables its
+rules for every scenario; without it `sentinel eval` runs no Sigma rules. See
+[Evaluation benchmark](#evaluation-benchmark) for the options and the frozen
+benchmark. As with the main benchmark, a pass means "no regression", not
+real-world accuracy.
+
+### Limitations
+
+- **No tuning through `sentinel tune`.** Sigma rules are not registered rules,
+  so the feedback loop cannot propose changes for them. You can suppress or
+  weight one by hand in `config.yaml`, using its `SIGMA-` id:
+
+  ```yaml
+  detection:
+    suppressions:
+      - rule: SIGMA-1a2b3c4d
+        user: deploy
+        expires: "2026-12-31"
+        note: nightly deploy job
+    disabled_rules: [SIGMA-5e6f7a8b]
+  risk:
+    rule_weights:
+      SIGMA-9c0d1e2f: 0.8
+  ```
+
+  The usual suppression rules apply (for example, alerts of critical severity
+  are never suppressed).
+- **Community rules can be noisy.** They are written for other environments.
+  Run them through `sentinel scan` on your own logs first and review what fires
+  before using them in `sentinel live` or with automated response.
+- **Event text is capped at 8192 characters** per field when a rule is
+  evaluated; content after that is not seen (see [SECURITY.md](SECURITY.md)).
+- **The data is syslog-style.** Rules can only match what SentinelAI's parsers
+  extract; there is no process-creation, audit or journal telemetry.
+
+---
+
 ## Evaluation benchmark
 
 `sentinel eval` measures detection quality reproducibly: it runs a fixed set of
@@ -399,7 +641,7 @@ Rules, enforced when scenarios are loaded (invalid labels abort the run):
   (`informational`, `low`, `medium`, `high`, `critical`) is satisfied when at
   least one alert from `expect.rules` reaches that level. `forbid.rules` lists
   rules that must not fire.
-- Rule IDs must exist in the rule registry (or be `AI001`).
+- Rule IDs must exist in the rule registry, be `AI001`, or be a Sigma rule id of the form `SIGMA-<8 hex>` (see "Sigma rule import").
 - **Incident expectations (optional, any scenario kind):**
   `expect.incidents` is the exact number of incidents the scan must produce
   (an integer >= 0; `0` asserts that nothing is correlated).

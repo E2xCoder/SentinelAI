@@ -1,0 +1,3 @@
+2026-01-07T11:00:01+00:00 app01 sudo[5201]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T11:05:03+00:00 app01 sudo[5210]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/rm -f /home/opsuser/.bash_history
+2026-01-07T11:10:00+00:00 app01 CRON[5220]: (root) CMD (/bin/sh -c 'unset HISTFILE; history -c')

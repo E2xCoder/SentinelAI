@@ -1,0 +1,31 @@
+title: Base64 Decoded Payload Piped Into A Shell
+id: 9897562d-ad49-48c2-bc34-a090375ceeeb
+status: experimental
+description: Detects a base64 decode whose output is piped straight into sh or bash, a common way to hide a payload from simple command inspection.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.defense_evasion
+  - attack.t1027
+  - attack.execution
+  - attack.t1059.004
+logsource:
+  product: linux
+  category: process_creation
+detection:
+  selection_decode:
+    CommandLine|contains:
+      - 'base64 -d'
+      - 'base64 --decode'
+      - 'base64 -D'
+  selection_shell:
+    CommandLine|contains:
+      - '| sh'
+      - '|sh'
+      - '| bash'
+      - '|bash'
+  condition: selection_decode and selection_shell
+falsepositives:
+  - Rare vendor installers that unpack an embedded script
+level: high

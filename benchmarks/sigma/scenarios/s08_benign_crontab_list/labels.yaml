@@ -1,0 +1,4 @@
+name: s08_benign_crontab_list
+kind: benign
+description: Cron jobs are only listed, never removed.
+files: [auth.log]

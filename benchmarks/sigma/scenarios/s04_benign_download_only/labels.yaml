@@ -1,0 +1,4 @@
+name: s04_benign_download_only
+kind: benign
+description: A sudo download of a package archive into /tmp with no chmod or execution.
+files: [auth.log]

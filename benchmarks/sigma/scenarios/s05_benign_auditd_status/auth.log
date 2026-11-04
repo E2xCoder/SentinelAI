@@ -1,0 +1,3 @@
+2026-01-07T04:00:01+00:00 app01 sudo[5501]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/apt update
+2026-01-07T04:06:00+00:00 app01 sudo[5530]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/bin/systemctl status auditd
+2026-01-07T04:06:30+00:00 app01 sudo[5531]: opsuser : TTY=pts/0 ; PWD=/home/opsuser ; USER=root ; COMMAND=/usr/sbin/auditctl -l

@@ -1,0 +1,4 @@
+name: s02_benign_history_search
+kind: benign
+description: Administrator searches the shell history for an earlier ssh command.
+files: [auth.log]

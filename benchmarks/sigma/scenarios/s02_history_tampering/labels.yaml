@@ -1,0 +1,6 @@
+name: s02_history_tampering
+kind: attack
+description: History is wiped with rm and disabled by a cron-run shell command.
+files: [auth.log]
+expect:
+  rules: [SIGMA-27e8e540]

@@ -1,0 +1,4 @@
+name: s07_benign_sshd_hardening
+kind: benign
+description: sshd_config is hardened to deny root login and passwords.
+files: [auth.log]

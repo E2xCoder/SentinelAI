@@ -113,6 +113,42 @@ Learning or tuning code must never write into `benchmarks/`.
   `203.0.113.0/24`), and no real hostnames, users or secrets.
 - Use LF line endings.
 
+## Adding a Sigma example rule
+
+The example pack in `examples/sigma/` and its benchmark root `benchmarks/sigma/`
+are separate from the main benchmark. The README section "Sigma rule import"
+describes the supported subset.
+
+1. Write an **original** rule in `examples/sigma/`. Do not copy rules from
+   SigmaHQ: they are under the Detection Rule License, the pack is MIT. Give it
+   a fresh UUID `id`, an `author`, a `level` and ATT&CK `tags`.
+2. Check that it imports: `sentinel rules import examples/sigma`. Your rule must
+   be listed as importable, not unsupported. Note its `SIGMA-<8 hex>` id.
+3. Add two scenarios under `benchmarks/sigma/scenarios/`: an **attack** that the
+   rule must catch and a **benign look-alike** that stays quiet (same service
+   and similar wording, harmless activity). Follow "Adding a scenario" and the
+   fixture conventions above; the attack lists the `SIGMA-` id in
+   `expect.rules`.
+4. Regenerate the manifest and the baseline of the Sigma root (not the main
+   one):
+
+   ```bash
+   sentinel eval --benchmarks benchmarks/sigma --sigma-rules examples/sigma \
+     --update-manifest --write-baseline benchmarks/sigma/baseline.json
+   ```
+
+5. Review the diff, then check that both gates are still green:
+
+   ```bash
+   sentinel eval --benchmarks benchmarks/sigma --sigma-rules examples/sigma \
+     --baseline benchmarks/sigma/baseline.json
+   sentinel eval --baseline benchmarks/baseline.json
+   ```
+
+Commit the rule, the scenarios, the manifest and the baseline together. The same
+rule as for the main benchmark applies: never regenerate them just to make CI
+pass.
+
 ## Security expectations
 
 SentinelAI parses attacker-controlled input and can change firewall state.

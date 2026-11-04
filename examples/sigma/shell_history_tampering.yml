@@ -1,0 +1,28 @@
+title: Shell History Cleared Or Disabled
+id: 27e8e540-afe4-4ab5-9b3a-991ca7782a7f
+status: experimental
+description: Detects commands that wipe or disable shell history (history -c, unset HISTFILE, HISTFILE=/dev/null, removal of .bash_history), run through sudo or a cron job to hide activity.
+author: SentinelAI project (example)
+date: 2026/11/04
+references: []
+tags:
+  - attack.defense_evasion
+  - attack.t1070.003
+logsource:
+  product: linux
+  category: process_creation
+detection:
+  selection_builtin:
+    CommandLine|contains:
+      - 'history -c'
+      - 'unset HISTFILE'
+      - 'HISTFILE=/dev/null'
+  selection_remove:
+    CommandLine|contains|all:
+      - 'rm '
+      - '.bash_history'
+  condition: 1 of selection_*
+falsepositives:
+  - Users deliberately clearing their own history on shared machines
+  - Provisioning scripts that reset images before templating
+level: medium

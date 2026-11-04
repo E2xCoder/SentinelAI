@@ -1,0 +1,844 @@
+{
+  "ai_used": true,
+  "mitre": {
+    "covered": 11,
+    "techniques": {
+      "T1003.008": {
+        "detected": true,
+        "rules": [
+          "SIGMA-5c2c3993"
+        ]
+      },
+      "T1014": {
+        "detected": true,
+        "rules": [
+          "SIGMA-3fc10c9f"
+        ]
+      },
+      "T1021.004": {
+        "detected": false,
+        "rules": [
+          "R032"
+        ]
+      },
+      "T1027": {
+        "detected": true,
+        "rules": [
+          "SIGMA-9897562d"
+        ]
+      },
+      "T1046": {
+        "detected": false,
+        "rules": [
+          "R030"
+        ]
+      },
+      "T1053.003": {
+        "detected": false,
+        "rules": [
+          "R040"
+        ]
+      },
+      "T1059.004": {
+        "detected": true,
+        "rules": [
+          "R031",
+          "SIGMA-9897562d",
+          "SIGMA-b6f30a0a"
+        ]
+      },
+      "T1070": {
+        "detected": true,
+        "rules": [
+          "SIGMA-9a632d2b"
+        ]
+      },
+      "T1070.003": {
+        "detected": true,
+        "rules": [
+          "SIGMA-27e8e540"
+        ]
+      },
+      "T1071": {
+        "detected": false,
+        "rules": [
+          "R031"
+        ]
+      },
+      "T1078": {
+        "detected": false,
+        "rules": [
+          "R007"
+        ]
+      },
+      "T1078.003": {
+        "detected": false,
+        "rules": [
+          "R005"
+        ]
+      },
+      "T1098": {
+        "detected": true,
+        "rules": [
+          "R012",
+          "SIGMA-66d96c74"
+        ]
+      },
+      "T1098.004": {
+        "detected": false,
+        "rules": [
+          "R041"
+        ]
+      },
+      "T1105": {
+        "detected": true,
+        "rules": [
+          "SIGMA-b6f30a0a"
+        ]
+      },
+      "T1110": {
+        "detected": false,
+        "rules": [
+          "R004",
+          "R006",
+          "R022"
+        ]
+      },
+      "T1110.001": {
+        "detected": false,
+        "rules": [
+          "R001"
+        ]
+      },
+      "T1110.003": {
+        "detected": false,
+        "rules": [
+          "R002"
+        ]
+      },
+      "T1110.004": {
+        "detected": false,
+        "rules": [
+          "R003"
+        ]
+      },
+      "T1136.001": {
+        "detected": false,
+        "rules": [
+          "R020"
+        ]
+      },
+      "T1489": {
+        "detected": true,
+        "rules": [
+          "R050",
+          "SIGMA-9a632d2b"
+        ]
+      },
+      "T1531": {
+        "detected": false,
+        "rules": [
+          "R021",
+          "R022"
+        ]
+      },
+      "T1543.002": {
+        "detected": false,
+        "rules": [
+          "R042"
+        ]
+      },
+      "T1546.004": {
+        "detected": false,
+        "rules": [
+          "R042"
+        ]
+      },
+      "T1547.006": {
+        "detected": true,
+        "rules": [
+          "SIGMA-3fc10c9f"
+        ]
+      },
+      "T1548": {
+        "detected": false,
+        "rules": [
+          "R012"
+        ]
+      },
+      "T1548.003": {
+        "detected": false,
+        "rules": [
+          "R010",
+          "R011"
+        ]
+      },
+      "T1552.004": {
+        "detected": false,
+        "rules": [
+          "R041"
+        ]
+      },
+      "T1562.001": {
+        "detected": true,
+        "rules": [
+          "R050",
+          "SIGMA-66d96c74",
+          "SIGMA-a06a0899"
+        ]
+      },
+      "T1562.004": {
+        "detected": false,
+        "rules": [
+          "R051"
+        ]
+      },
+      "T1595.001": {
+        "detected": false,
+        "rules": [
+          "R030"
+        ]
+      },
+      "T1610": {
+        "detected": false,
+        "rules": [
+          "R060"
+        ]
+      },
+      "T1611": {
+        "detected": false,
+        "rules": [
+          "R060"
+        ]
+      }
+    },
+    "total": 33
+  },
+  "risk": {
+    "attack": {
+      "alerts": 11,
+      "by_level": {
+        "critical": 0,
+        "high": 0,
+        "informational": 0,
+        "low": 2,
+        "medium": 9
+      },
+      "max": 50.0,
+      "mean": 38.64,
+      "min": 25.0
+    },
+    "benign": {
+      "alerts": 0,
+      "by_level": {
+        "critical": 0,
+        "high": 0,
+        "informational": 0,
+        "low": 0,
+        "medium": 0
+      },
+      "max": null,
+      "mean": null,
+      "min": null
+    }
+  },
+  "rules": {
+    "R001": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "SSH Brute Force",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R002": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Password Spraying",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R003": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Credential Stuffing",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R004": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Repeated Authentication Failures",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R005": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Root Login",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R006": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Impossible Login Frequency",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R007": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Login Hours",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R010": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Unauthorized Sudo Attempt",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R011": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Sudo Abuse",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R012": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Privilege Escalation",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R020": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "New User Created",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R021": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "User Account Deleted",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R022": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Account Locked",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R030": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Port Scan",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R031": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Reverse Shell Indicator",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R032": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Lateral Movement",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R040": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Cron Activity",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R041": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "SSH Key Manipulation",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R042": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Persistence Indicator",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R050": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Service Stopped Unexpectedly",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R051": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Firewall Modification",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "R060": {
+      "attack_scenarios": 0,
+      "fn": 0,
+      "fp": 0,
+      "name": "Suspicious Docker Activity",
+      "precision": null,
+      "recall": null,
+      "tp": 0
+    },
+    "SIGMA-27e8e540": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Shell History Cleared Or Disabled",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-3fc10c9f": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Kernel Module Loaded From A Temporary Path",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-5c2c3993": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Sudo Used To Read Or Copy The Shadow Password File",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-66d96c74": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "SSH Daemon Configuration Weakened From The Command Line",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-9897562d": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Base64 Decoded Payload Piped Into A Shell",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-9a632d2b": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "All Cron Jobs Of A User Removed With crontab -r",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-a06a0899": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "Linux Audit Daemon Stopped Or Auditing Disabled",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    },
+    "SIGMA-b6f30a0a": {
+      "attack_scenarios": 1,
+      "fn": 0,
+      "fp": 0,
+      "name": "File Downloaded Into A Temporary Directory And Made Executable",
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 1
+    }
+  },
+  "scenarios": [
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s01_benign_hostname_read",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 50.0,
+          "rule_id": "SIGMA-5c2c3993"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-5c2c3993"
+      ],
+      "fired_rules": [
+        "SIGMA-5c2c3993"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s01_shadow_read",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s02_benign_history_search",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 25.0,
+          "rule_id": "SIGMA-27e8e540"
+        },
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-27e8e540"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-27e8e540"
+      ],
+      "fired_rules": [
+        "SIGMA-27e8e540"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s02_history_tampering",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "R040"
+        },
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-9897562d"
+        },
+        {
+          "risk_level": "medium",
+          "risk_score": 45.0,
+          "rule_id": "SIGMA-9897562d"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-9897562d"
+      ],
+      "fired_rules": [
+        "R040",
+        "SIGMA-9897562d"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s03_base64_to_shell",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s03_benign_base64_decode",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s04_benign_download_only",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-b6f30a0a"
+        }
+      ],
+      "events": 2,
+      "expected_rules": [
+        "SIGMA-b6f30a0a"
+      ],
+      "fired_rules": [
+        "SIGMA-b6f30a0a"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s04_download_to_tmp_exec",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-a06a0899"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-a06a0899"
+      ],
+      "fired_rules": [
+        "SIGMA-a06a0899"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s05_auditd_stopped",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s05_benign_auditd_status",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s06_benign_module_load",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-3fc10c9f"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-3fc10c9f"
+      ],
+      "fired_rules": [
+        "SIGMA-3fc10c9f"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s06_module_from_tmp",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s07_benign_sshd_hardening",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "medium",
+          "risk_score": 40.0,
+          "rule_id": "SIGMA-66d96c74"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-66d96c74"
+      ],
+      "fired_rules": [
+        "SIGMA-66d96c74"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s07_sshd_weakened",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [],
+      "events": 3,
+      "expected_rules": [],
+      "fired_rules": [],
+      "kind": "benign",
+      "missing_rules": [],
+      "name": "s08_benign_crontab_list",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    },
+    {
+      "alerts": [
+        {
+          "risk_level": "low",
+          "risk_score": 25.0,
+          "rule_id": "SIGMA-9a632d2b"
+        }
+      ],
+      "events": 3,
+      "expected_rules": [
+        "SIGMA-9a632d2b"
+      ],
+      "fired_rules": [
+        "SIGMA-9a632d2b"
+      ],
+      "kind": "attack",
+      "missing_rules": [],
+      "name": "s08_crontab_removed",
+      "passed": true,
+      "risk_ok": true,
+      "unexpected_rules": []
+    }
+  ],
+  "schema_version": 1,
+  "sentinelai_version": "0.1.0",
+  "summary": {
+    "attack_recall": 1.0,
+    "attack_scenarios": 8,
+    "benign_alerts": 0,
+    "benign_events": 24,
+    "benign_scenarios": 8,
+    "fp_per_1k_benign_events": 0.0,
+    "precision": 1.0,
+    "scenarios_passed": 16,
+    "scenarios_total": 16,
+    "uncovered_rules": [
+      "R001",
+      "R002",
+      "R003",
+      "R004",
+      "R005",
+      "R006",
+      "R007",
+      "R010",
+      "R011",
+      "R012",
+      "R020",
+      "R021",
+      "R022",
+      "R030",
+      "R031",
+      "R032",
+      "R040",
+      "R041",
+      "R042",
+      "R050",
+      "R051",
+      "R060"
+    ]
+  }
+}

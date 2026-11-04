@@ -1,0 +1,4 @@
+name: s03_benign_base64_decode
+kind: benign
+description: A cron job decodes a base64 file into a binary file without any shell.
+files: [auth.log]

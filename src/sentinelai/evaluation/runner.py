@@ -9,6 +9,7 @@ never touches the operator's real state directory.
 
 from __future__ import annotations
 
+import re
 import tempfile
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -23,7 +24,7 @@ from sentinelai.config.models import SentinelConfig
 from sentinelai.core.exceptions import EvaluationError
 from sentinelai.core.models import LogEvent
 from sentinelai.core.pipeline import AnalysisPipeline
-from sentinelai.detection.base import available_rules
+from sentinelai.detection.base import Rule, available_rules
 from sentinelai.evaluation.metrics import compute_metrics
 from sentinelai.evaluation.models import (
     KIND_ATTACK,
@@ -90,22 +91,27 @@ def _string_list(value: object, field_name: str, scenario: str) -> tuple[str, ..
     return tuple(value)
 
 
-def _rule_ids(value: object, field_name: str, scenario: str) -> tuple[str, ...]:
-    ids = _string_list(value, field_name, scenario)
+def _check_known_rules(ids: tuple[str, ...], field_name: str, scenario: str) -> None:
+    """Reject ids that are neither registered, the AI rule, nor a Sigma-shaped id."""
+    from sentinelai.sigma import SIGMA_RULE_ID_RE
+
+    sigma_re = re.compile(SIGMA_RULE_ID_RE)
     known = set(available_rules()) | {AI_RULE_ID}
     for rule_id in ids:
-        if rule_id not in known:
+        if rule_id not in known and sigma_re.fullmatch(rule_id) is None:
             raise _fail(scenario, f"{field_name!r} references unknown rule {rule_id!r}")
+
+
+def _rule_ids(value: object, field_name: str, scenario: str) -> tuple[str, ...]:
+    ids = _string_list(value, field_name, scenario)
+    _check_known_rules(ids, field_name, scenario)
     return tuple(sorted(set(ids)))
 
 
 def _ordered_rule_ids(value: object, field_name: str, scenario: str) -> tuple[str, ...]:
     """Like :func:`_rule_ids` but keeps the given order (no sorting or dedup)."""
     ids = _string_list(value, field_name, scenario)
-    known = set(available_rules()) | {AI_RULE_ID}
-    for rule_id in ids:
-        if rule_id not in known:
-            raise _fail(scenario, f"{field_name!r} references unknown rule {rule_id!r}")
+    _check_known_rules(ids, field_name, scenario)
     return ids
 
 
@@ -322,21 +328,27 @@ def run_scenario(
     return result, scan.ai_used
 
 
-def _rule_catalog() -> Mapping[str, RuleInfo]:
-    return {
+def _rule_catalog(sigma_rules: Sequence[Rule] = ()) -> Mapping[str, RuleInfo]:
+    catalog = {
         rule_id: RuleInfo(rule_id, cls.name, tuple(cls.mitre_techniques))
         for rule_id, cls in sorted(available_rules().items())
     }
+    for rule in sorted(sigma_rules, key=lambda r: r.rule_id):
+        catalog[rule.rule_id] = RuleInfo(rule.rule_id, rule.name, tuple(rule.mitre_techniques))
+    return catalog
 
 
 def run_benchmark(
     root: Path,
     *,
     configure: Callable[[SentinelConfig], None] | None = None,
+    sigma_rules: Sequence[Rule] = (),
 ) -> EvalReport:
     """Run every scenario under *root* and aggregate the metrics.
 
     *configure* is passed to every scenario to score a candidate configuration.
+    *sigma_rules* are imported Sigma rules added to the rule catalog so they
+    appear in the per-rule metrics and the MITRE matrix.
     """
     scenarios = load_scenarios(root)
     results: list[ScenarioResult] = []
@@ -350,7 +362,7 @@ def run_benchmark(
             ai_used = ai_used or used_ai
         elapsed = time.perf_counter() - started
 
-    rules, summary, risk, mitre = compute_metrics(results, _rule_catalog())
+    rules, summary, risk, mitre = compute_metrics(results, _rule_catalog(sigma_rules))
     total_events = sum(r.events for r in results)
     performance: dict[str, Any] = {
         "events": total_events,

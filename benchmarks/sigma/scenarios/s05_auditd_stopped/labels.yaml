@@ -1,0 +1,6 @@
+name: s05_auditd_stopped
+kind: attack
+description: Auditd is stopped and kernel auditing is switched off via sudo.
+files: [auth.log]
+expect:
+  rules: [SIGMA-a06a0899]

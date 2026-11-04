@@ -36,7 +36,7 @@ TUNABLE_DETECTION_FIELDS: tuple[str, ...] = (
     "suppressions",
 )
 
-_RULE_ID_RE = re.compile(r"[A-Z]{1,3}[0-9]{3}")
+_RULE_ID_RE = re.compile(r"[A-Z]{1,3}[0-9]{3}|SIGMA-[0-9a-f]{8}")
 _USER_RE = re.compile(r"[A-Za-z0-9_.@-]{1,64}")
 _SUPPRESSION_KEYS = frozenset({"rule", "user", "ip", "expires", "note"})
 _MAX_NOTE_LENGTH = 200
@@ -87,7 +87,7 @@ def _parse_suppression(entry: Any, where: str) -> Suppression:
 
     rule = entry.get("rule")
     if not isinstance(rule, str) or not _RULE_ID_RE.fullmatch(rule):
-        raise ConfigError(f"{where}: 'rule' is required and must look like R001")
+        raise ConfigError(f"{where}: 'rule' is required and must look like R001 or SIGMA-1a2b3c4d")
 
     user = entry.get("user")
     ip = entry.get("ip")
@@ -412,11 +412,16 @@ class ResponseConfig:
     max_blocks_per_hour: int = 30
     pending_expire_seconds: int = 86400
     reap_interval_seconds: int = 60
+    #: Sigma alerts never trigger AUTOMATIC blocking unless this is true; in
+    #: approval mode they may still be queued for a human.
+    include_sigma_rules: bool = False
 
     def _validate_safety(self) -> None:
         """Validate the safe-response fields (mode, protected ranges, limits)."""
         if self.mode not in ("auto", "approval"):
             raise ConfigError("response.mode must be one of: auto, approval")
+        if not isinstance(self.include_sigma_rules, bool):
+            raise ConfigError("response.include_sigma_rules must be a boolean")
         for name in ("allowlist", "admin_ranges"):
             entries = getattr(self, name)
             if not isinstance(entries, (list, tuple)):
@@ -659,6 +664,26 @@ class CorrelationConfig:
 
 
 @dataclass(slots=True)
+class SigmaConfig:
+    """Optional Sigma rule pack loaded as extra detection rules."""
+
+    enabled: bool = False
+    rules_dir: str = ""
+    max_rules: int = 2000
+    max_file_kb: int = 256
+
+    def validate(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise ConfigError("sigma.enabled must be a boolean")
+        if not isinstance(self.rules_dir, str):
+            raise ConfigError("sigma.rules_dir must be a string")
+        if self.enabled and not self.rules_dir.strip():
+            raise ConfigError("sigma.rules_dir is required when sigma.enabled is true")
+        _check_int_range("sigma.max_rules", self.max_rules, 1, 10_000)
+        _check_int_range("sigma.max_file_kb", self.max_file_kb, 1, 4_096)
+
+
+@dataclass(slots=True)
 class SentinelConfig:
     """Root configuration object."""
 
@@ -676,6 +701,7 @@ class SentinelConfig:
     limits: LimitsConfig = field(default_factory=LimitsConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
     correlation: CorrelationConfig = field(default_factory=CorrelationConfig)
+    sigma: SigmaConfig = field(default_factory=SigmaConfig)
     source_path: str = ""
     tuning_overlay: str = ""
 
@@ -692,6 +718,7 @@ class SentinelConfig:
         self.limits.validate()
         self.notify.validate()
         self.correlation.validate()
+        self.sigma.validate()
 
     def resolve_state_dir(self) -> Path:
         """Return the state directory, creating it when needed."""

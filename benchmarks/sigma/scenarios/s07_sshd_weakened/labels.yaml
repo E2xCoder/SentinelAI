@@ -1,0 +1,6 @@
+name: s07_sshd_weakened
+kind: attack
+description: sshd_config is edited to permit root login and password authentication.
+files: [auth.log]
+expect:
+  rules: [SIGMA-66d96c74]

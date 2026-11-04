@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +23,14 @@ from sentinelai.cli import console as ui
 from sentinelai.cli.common import fail, load_context
 from sentinelai.config.models import SentinelConfig
 from sentinelai.core.exceptions import EvaluationError, SentinelError
+from sentinelai.detection.base import Rule
 from sentinelai.evaluation.compare import Regression, Thresholds, compare_reports, load_baseline
 from sentinelai.evaluation.manifest import verify_manifest, write_manifest
 from sentinelai.evaluation.models import EvalReport, ScenarioResult
 from sentinelai.evaluation.runner import load_scenarios, run_benchmark
 from sentinelai.evaluation.triage_eval import run_triage_eval
+
+ConfigureFn = Callable[[SentinelConfig], None]
 
 
 def _pct(value: object) -> str:
@@ -187,6 +191,29 @@ def _run_triage(
         _write_json(output, data)
 
 
+def _load_sigma(directory: Path, *, to_stderr: bool) -> tuple[list[Rule], ConfigureFn]:
+    """Load Sigma rules for the benchmark; return them plus a config callback enabling them."""
+    from sentinelai.sigma import load_rules
+
+    try:
+        loaded = load_rules(directory)
+    except OSError as exc:
+        raise EvaluationError(f"Cannot load Sigma rules from {directory}: {exc}") from exc
+    out = ui.error_console if to_stderr else ui.console
+    out.print(
+        f"[bold]Sigma rules:[/bold] {len(loaded.rules)} loaded, "
+        f"{len(loaded.unsupported)} unsupported "
+        f"({loaded.files_scanned} file(s) scanned in {ui._safe(directory)})"
+    )
+    rules_dir = str(directory)
+
+    def configure(config: SentinelConfig) -> None:
+        config.sigma.enabled = True
+        config.sigma.rules_dir = rules_dir
+
+    return list(loaded.rules), configure
+
+
 @click.command("eval")
 @click.option(
     "--benchmarks",
@@ -232,6 +259,12 @@ def _run_triage(
 )
 @click.option("--json", "as_json", is_flag=True, help="Print the JSON report to stdout.")
 @click.option(
+    "--sigma-rules",
+    "sigma_rules_dir",
+    type=click.Path(path_type=Path),
+    help="Also score the Sigma rules in this directory (enabled for every scenario).",
+)
+@click.option(
     "--triage",
     is_flag=True,
     help="Also triage attack-scenario alerts with the configured LLM (advisory, needs ai.llm).",
@@ -259,6 +292,7 @@ def eval_cmd(
     max_recall_drop: float,
     max_fp_increase: float,
     as_json: bool,
+    sigma_rules_dir: Path | None,
     triage: bool,
     triage_limit: int,
     triage_output: Path | None,
@@ -280,7 +314,17 @@ def eval_cmd(
         else:
             _check_manifest(benchmarks)
 
-        report = run_benchmark(benchmarks / "scenarios")
+        configure: ConfigureFn | None = None
+        sigma_rules: list[Rule] = []
+        if sigma_rules_dir is not None:
+            sigma_rules, configure = _load_sigma(sigma_rules_dir, to_stderr=as_json)
+
+        if configure is None and not sigma_rules:
+            report = run_benchmark(benchmarks / "scenarios")
+        else:
+            report = run_benchmark(
+                benchmarks / "scenarios", configure=configure, sigma_rules=sigma_rules
+            )
         failed = any(not s.passed for s in report.scenarios)
 
         if as_json:

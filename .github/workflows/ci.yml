@@ -39,6 +39,9 @@ jobs:
       - name: Detection benchmark (regression gate)
         run: sentinel eval --baseline benchmarks/baseline.json
 
+      - name: Sigma pack benchmark (regression gate)
+        run: sentinel eval --benchmarks benchmarks/sigma --sigma-rules examples/sigma --baseline benchmarks/sigma/baseline.json
+
   docker:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,6 @@
+name: s03_base64_to_shell
+kind: attack
+description: A cron job decodes a base64 blob and pipes it into a shell.
+files: [auth.log]
+expect:
+  rules: [SIGMA-9897562d]

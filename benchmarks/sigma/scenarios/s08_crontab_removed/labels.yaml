@@ -1,0 +1,6 @@
+name: s08_crontab_removed
+kind: attack
+description: All cron jobs of two users are deleted with crontab -r.
+files: [auth.log]
+expect:
+  rules: [SIGMA-9a632d2b]

@@ -59,6 +59,9 @@ In scope:
   verdict, or to escape the validation described in the README.
 - **Secrets handling**: API keys, tokens, webhooks or passwords leaking into
   logs, error messages, reports, the database or terminal output.
+- **Sigma rule import**: a crafted Sigma file that causes code execution, a
+  crash, a hang, unbounded memory or CPU use, or that reads outside the rules
+  directory.
 - **Container and systemd hardening**: weaknesses in the `Dockerfile` or the
   units under `deploy/`.
 - **Plugin loading**: bugs in the loader itself. Note that plugins are trusted
@@ -93,6 +96,14 @@ Out of scope:
 - **Secrets only from the environment.** API keys, tokens, webhooks and
   passwords are meant to be supplied through `SENTINELAI_*` environment
   variables. They are excluded from `repr` output and from error messages.
+- **Sigma files are untrusted input.** They are read with `yaml.safe_load_all`,
+  never executed, and compiled into plain data that a small fixed evaluator
+  interprets. File size, documents per file, rule count, list lengths, value
+  lengths, condition length and nesting depth are capped; anything outside the
+  supported subset is rejected, not approximated. The `re` modifier is not
+  supported and no regular expression is built from rule data. Symlinks are not
+  followed, and files resolving outside the rules directory are skipped. Sigma
+  is off by default.
 - **No shell.** External commands are run with argument lists, never through a
   shell.
 - **Bounded input.** Line length, decompressed size, response sizes and message
@@ -114,6 +125,13 @@ These are not vulnerabilities to report, but you should know them:
   (512 characters of overlap), so padding cannot hide a command. A single
   command pattern whose match is longer than 512 characters can still be cut at a
   window edge and missed.
+- Sigma rules evaluate only the first 8 KiB (8192 characters) of each event
+  field. Content placed after that in a very long line is not seen by Sigma
+  rules, so padding can evade them. The wildcard matcher is iterative and has no
+  exponential backtracking, but its worst case is text length times pattern
+  length (both capped), not constant. Community Sigma rules are third-party
+  detection content: they can be noisy or wrong, and a rule you load decides
+  what raises alerts.
 - Gateway detection for lockout protection reads `/proc/net/route`: Linux only,
   IPv4 only.
 - SSH-peer protection only knows the session that started SentinelAI. Other

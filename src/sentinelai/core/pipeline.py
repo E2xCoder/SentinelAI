@@ -11,6 +11,7 @@ from collections import Counter, deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sentinelai.ai.behavior import BehaviorAnalyzer
 from sentinelai.ai.engine import AIEngine
@@ -28,6 +29,9 @@ from sentinelai.firewall.responder import AutoResponder
 from sentinelai.intel.aggregator import ThreatIntelAggregator
 from sentinelai.risk.engine import RiskEngine
 from sentinelai.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from sentinelai.sigma import LoadReport
 
 _LOGGER = get_logger("core.pipeline")
 
@@ -85,7 +89,9 @@ class AnalysisPipeline:
         self._config = config
         state_dir = config.resolve_state_dir()
         self.store = AlertStore(state_dir / "alerts.db")
-        self.rule_engine = RuleEngine(config.detection)
+        self.sigma_report = self._load_sigma(config)
+        extra_rules = self.sigma_report.rules if self.sigma_report is not None else None
+        self.rule_engine = RuleEngine(config.detection, extra_rules=extra_rules)
         self.risk_engine = RiskEngine(rule_weights=config.risk.rule_weights)
         self.intel = ThreatIntelAggregator(config.intel, state_dir)
         self.ai = AIEngine(config.ai)
@@ -108,6 +114,29 @@ class AnalysisPipeline:
             self.response_audit,
             self.guard,
         )
+
+    @staticmethod
+    def _load_sigma(config: SentinelConfig) -> LoadReport | None:
+        """Load the Sigma rule pack; a broken pack never stops SentinelAI."""
+        if not config.sigma.enabled:
+            return None
+        try:
+            from pathlib import Path
+
+            from sentinelai.sigma import load_rules
+
+            report = load_rules(
+                Path(config.sigma.rules_dir).expanduser(),
+                max_rules=config.sigma.max_rules,
+                max_file_bytes=config.sigma.max_file_kb * 1024,
+            )
+        except Exception as exc:  # noqa: BLE001 - a broken pack must not stop SentinelAI
+            _LOGGER.warning("Sigma rules skipped: %s", exc)
+            return None
+        _LOGGER.info(
+            "%d Sigma rules loaded, %d unsupported", len(report.rules), len(report.unsupported)
+        )
+        return report
 
     @property
     def response_config(self) -> ResponseConfig:

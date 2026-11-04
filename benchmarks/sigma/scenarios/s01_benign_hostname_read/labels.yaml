@@ -1,0 +1,4 @@
+name: s01_benign_hostname_read
+kind: benign
+description: Sudo reads harmless system files such as /etc/hostname.
+files: [auth.log]
