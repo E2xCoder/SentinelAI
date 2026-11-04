@@ -1,5 +1,8 @@
 """Parsers for Apache HTTP Server access and error logs."""
 
+# ReDoS hardening: request-line part of _ACCESS made deterministic (no overlapping
+# quantifiers); regexes only see line[:MAX_LINE]; raw keeps the full line.
+
 from __future__ import annotations
 
 import re
@@ -8,11 +11,20 @@ from sentinelai.core.models import EventCategory, EventType, LogEvent, Severity
 from sentinelai.parsers.base import LogParser, register_parser
 from sentinelai.utils.timeparse import parse_clf_timestamp
 
+#: Upper bound on the line length handed to the regex engine.
+MAX_LINE = 8192
+# Access-log lines carry the attacker-controlled request in the middle and the
+# status/size at the END, so truncating them drops the whole event (evasion by
+# padding). The access regex is linear, so it may look at the reader's full limit.
+ACCESS_MAX_LINE = 65_536
+
 # Common/Combined Log Format:
 # 1.2.3.4 - frank [10/Oct/2000:13:55:36 -0700] "GET /x HTTP/1.0" 200 2326 "ref" "ua"
 _ACCESS = re.compile(
     r"^(?P<ip>\S+)\s+\S+\s+(?P<user>\S+)\s+\[(?P<ts>[^\]]+)\]\s+"
-    r'"(?P<method>[A-Z]+)?\s*(?P<path>[^"\s]*)[^"]*"\s+'
+    # Each quantifier is forced maximal by a lookahead, so a failed match cannot
+    # re-split method/whitespace/path/rest (was cubic on an unterminated quote).
+    r'"(?:(?P<method>[A-Z]+)(?![A-Z]))?\s*(?!\s)(?P<path>[^"\s]*)(?![^"\s])[^"]*"\s+'
     r"(?P<status>\d{3})\s+(?P<size>\d+|-)"
     r'(?:\s+"(?P<referer>[^"]*)"\s+"(?P<agent>[^"]*)")?'
 )
@@ -52,7 +64,7 @@ def status_severity(status: int) -> Severity:
 
 def build_access_event(line: str, source_name: str) -> LogEvent | None:
     """Shared builder for CLF access lines (Apache and Nginx)."""
-    match = _ACCESS.match(line)
+    match = _ACCESS.match(line[:ACCESS_MAX_LINE])
     if not match:
         return None
     timestamp = parse_clf_timestamp(match.group("ts"))
@@ -93,7 +105,8 @@ class ApacheAccessParser(LogParser):
     def match_score(self, sample_lines: list[str]) -> float:
         if not sample_lines:
             return 0.0
-        return sum(1 for line in sample_lines if _ACCESS.match(line)) / len(sample_lines)
+        hits = sum(1 for line in sample_lines if _ACCESS.match(line[:ACCESS_MAX_LINE]))
+        return hits / len(sample_lines)
 
     def parse_line(self, line: str) -> LogEvent | None:
         return build_access_event(line, "apache")
@@ -112,7 +125,7 @@ class ApacheErrorParser(LogParser):
             return 0.0
         hits = 0
         for line in sample_lines:
-            match = _ERROR.match(line)
+            match = _ERROR.match(line[:MAX_LINE])
             if match and self._parse_ts(match.group("ts")) is not None:
                 hits += 1
         return hits / len(sample_lines)
@@ -129,7 +142,7 @@ class ApacheErrorParser(LogParser):
         return None
 
     def parse_line(self, line: str) -> LogEvent | None:
-        match = _ERROR.match(line)
+        match = _ERROR.match(line[:MAX_LINE])
         if not match:
             return None
         timestamp = self._parse_ts(match.group("ts"))

@@ -10,6 +10,9 @@ The syslog parser also understands these when they appear inline in
 extracts the full netfilter field set.
 """
 
+# ReDoS hardening: _FIELD only starts at uppercase-run boundaries; regexes
+# only see line[:_MAX_LINE].
+
 from __future__ import annotations
 
 import re
@@ -25,7 +28,11 @@ _HEADER = re.compile(
     r"\[UFW (?P<action>BLOCK|ALLOW|AUDIT|DENY)\]\s*(?P<fields>.*)$"
 )
 
-_FIELD = re.compile(r"([A-Z]+)=(\S*)")
+#: Upper bound on the line length handed to the regex engine.
+_MAX_LINE = 8192
+
+# (?<![A-Z]) avoids re-scanning a long uppercase run from every offset.
+_FIELD = re.compile(r"(?<![A-Z])([A-Z]+)=(\S*)")
 
 _ACTION_EVENT = {
     "BLOCK": EventType.FIREWALL_BLOCK,
@@ -46,10 +53,11 @@ class UFWParser(LogParser):
     def match_score(self, sample_lines: list[str]) -> float:
         if not sample_lines:
             return 0.0
-        return sum(1 for line in sample_lines if _HEADER.match(line)) / len(sample_lines)
+        hits = sum(1 for line in sample_lines if _HEADER.match(line[:_MAX_LINE]))
+        return hits / len(sample_lines)
 
     def parse_line(self, line: str) -> LogEvent | None:
-        match = _HEADER.match(line)
+        match = _HEADER.match(line[:_MAX_LINE])
         if not match:
             return None
         ts_raw = match.group("ts")

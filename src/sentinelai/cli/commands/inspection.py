@@ -101,9 +101,11 @@ def search(
     parser_name: str | None,
 ) -> None:
     """Search and filter events in a log file."""
+    from sentinelai.cli.commands.analysis import limits_from_config
     from sentinelai.parsers.reader import read_events
     from sentinelai.search.query import build_query
 
+    limits = limits_from_config(load_context(ctx).config)
     table = Table(title=f"Matches in {Path(logfile).name}", header_style="bold")
     shown = 0
     total = 0
@@ -115,7 +117,9 @@ def search(
         )
         for col in ("Time", "Severity", "Type", "IP", "User", "Message"):
             table.add_column(col)
-        for event in query.filter(read_events(logfile, parser_name=parser_name)):
+        for event in query.filter(
+            read_events(logfile, parser_name=parser_name, limits=limits)
+        ):
             total += 1
             if shown < limit:
                 table.add_row(

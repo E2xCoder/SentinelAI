@@ -23,8 +23,12 @@ EventCallback = Callable[[LogEvent], None]
 class _Source:
     """A tailed file plus its lazily detected parser."""
 
-    def __init__(self, path: Path, from_beginning: bool) -> None:
-        self.tailer = LogTailer(path, from_beginning=from_beginning)
+    def __init__(
+        self, path: Path, from_beginning: bool, max_line_chars: int = 65_536
+    ) -> None:
+        self.tailer = LogTailer(
+            path, from_beginning=from_beginning, max_line_chars=max_line_chars
+        )
         self.parser: LogParser | None = None
         self.pending_sample: list[str] = []
 
@@ -55,6 +59,7 @@ class LiveMonitor:
         pipeline: AnalysisPipeline,
         on_alert: AlertCallback | None = None,
         on_event: EventCallback | None = None,
+        max_line_chars: int = 65_536,
     ) -> None:
         self._config = config
         self._pipeline = pipeline
@@ -62,7 +67,8 @@ class LiveMonitor:
         self._on_event = on_event
         self._stop = threading.Event()
         self._sources = [
-            _Source(Path(p).expanduser(), config.from_beginning) for p in config.paths
+            _Source(Path(p).expanduser(), config.from_beginning, max_line_chars)
+            for p in config.paths
         ]
         self.events_seen = 0
         self.alerts_raised = 0

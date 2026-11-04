@@ -6,6 +6,8 @@ This keeps per-service knowledge in one place and makes new patterns a
 one-line addition.
 """
 
+# ReDoS hardening: input capped at _MAX_MESSAGE, gaps bounded, token scans anchored with (?<!\S).
+
 from __future__ import annotations
 
 import re
@@ -67,6 +69,9 @@ def _c(
     return build
 
 
+#: Upper bound on the message length handed to the regex engine (ReDoS guard).
+_MAX_MESSAGE = 4096
+
 _IP = r"(?P<ip>(?:\d{1,3}\.){3}\d{1,3}|[0-9A-Fa-f:]{3,45})"
 _USER = r"(?P<user>[\w.@\\-]+)"
 _PORT = r"(?P<port>\d{1,5})"
@@ -113,7 +118,7 @@ _SSHD_PATTERNS: list[tuple[Pattern[str], Builder]] = [
         _c(EventType.PORT_PROBE, EventCategory.NETWORK, Severity.NOTICE),
     ),
     (
-        re.compile(rf"reverse mapping checking .* \[{_IP}\] .* POSSIBLE BREAK-IN ATTEMPT"),
+        re.compile(rf"reverse mapping checking .{{0,800}} \[{_IP}\] .{{0,128}} POSSIBLE BREAK-IN ATTEMPT"),
         _c(EventType.CONNECTION, EventCategory.SSH, Severity.WARNING),
     ),
     (
@@ -228,7 +233,7 @@ _SYSTEMD_PATTERNS: list[tuple[Pattern[str], Builder]] = [
         _c(EventType.SERVICE_FAILED, EventCategory.SERVICE_MANAGEMENT, Severity.ERROR, unit="unit"),
     ),
     (
-        re.compile(r"(?P<unit>\S+): Main process exited, code=(?P<code>\S+), status=(?P<status>\S+)"),
+        re.compile(r"(?<!\S)(?P<unit>\S+): Main process exited, code=(?P<code>\S+), status=(?P<status>\S+)"),
         _c(EventType.SERVICE_FAILED, EventCategory.SERVICE_MANAGEMENT, Severity.ERROR, unit="unit", code="code", status="status"),
     ),
     (
@@ -244,14 +249,14 @@ _SYSTEMD_PATTERNS: list[tuple[Pattern[str], Builder]] = [
         _c(EventType.SERVICE_STARTED, EventCategory.SERVICE_MANAGEMENT, Severity.INFO, unit="unit"),
     ),
     (
-        re.compile(r"(?P<unit>\S+) entered failed state"),
+        re.compile(r"(?<!\S)(?P<unit>\S+) entered failed state"),
         _c(EventType.SERVICE_FAILED, EventCategory.SERVICE_MANAGEMENT, Severity.ERROR, unit="unit"),
     ),
 ]
 
 _KERNEL_PATTERNS: list[tuple[Pattern[str], Builder]] = [
     (
-        re.compile(rf"\[UFW (?P<action>BLOCK|AUDIT|ALLOW)\].*SRC={_IP}\s+DST=(?P<dst>\S+).*?(?:SPT=(?P<spt>\d+))?\s*(?:DPT={_PORT})?"),
+        re.compile(rf"\[UFW (?P<action>BLOCK|AUDIT|ALLOW)\].{{0,512}}SRC={_IP}\s+DST=(?P<dst>\S+)(?:SPT=(?P<spt>\d+))?\s*(?:DPT={_PORT})?"),
         _c(EventType.FIREWALL_BLOCK, EventCategory.FIREWALL, Severity.NOTICE, action="action", dst="dst", src_port="spt"),
     ),
 ]
@@ -313,6 +318,7 @@ def classify_message(service: str | None, message: str) -> Classification:
     Falls back to generic PAM patterns and finally to a best-effort
     category derived from the service name. Never raises.
     """
+    message = message[:_MAX_MESSAGE]
     default_category = EventCategory.SYSTEM
     if service:
         for service_re, table, category in _SERVICE_TABLES:

@@ -36,3 +36,9 @@ linux-firewall-automation-main/
 .vscode/
 *.swp
 .DS_Store
+
+# Environment files that hold secrets (API keys, webhooks, SMTP password)
+sentinelai.env
+*.env
+.env
+!deploy/sentinelai.env.example

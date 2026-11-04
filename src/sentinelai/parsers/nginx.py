@@ -1,12 +1,14 @@
 """Parsers for Nginx access and error logs."""
 
+# ReDoS hardening: regexes only see line[:MAX_LINE]; raw keeps the full line.
+
 from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
 
 from sentinelai.core.models import EventCategory, EventType, LogEvent, Severity
-from sentinelai.parsers.apache import _ACCESS, build_access_event
+from sentinelai.parsers.apache import _ACCESS, ACCESS_MAX_LINE, MAX_LINE, build_access_event
 from sentinelai.parsers.base import LogParser, register_parser
 
 # 2024/01/07 03:14:15 [error] 123#123: *45 msg, client: 1.2.3.4, server: x,
@@ -43,7 +45,8 @@ class NginxAccessParser(LogParser):
     def match_score(self, sample_lines: list[str]) -> float:
         if not sample_lines:
             return 0.0
-        return sum(1 for line in sample_lines if _ACCESS.match(line)) / len(sample_lines)
+        hits = sum(1 for line in sample_lines if _ACCESS.match(line[:ACCESS_MAX_LINE]))
+        return hits / len(sample_lines)
 
     def parse_line(self, line: str) -> LogEvent | None:
         return build_access_event(line, "nginx")
@@ -60,10 +63,10 @@ class NginxErrorParser(LogParser):
     def match_score(self, sample_lines: list[str]) -> float:
         if not sample_lines:
             return 0.0
-        return sum(1 for line in sample_lines if _ERROR.match(line)) / len(sample_lines)
+        return sum(1 for line in sample_lines if _ERROR.match(line[:MAX_LINE])) / len(sample_lines)
 
     def parse_line(self, line: str) -> LogEvent | None:
-        match = _ERROR.match(line)
+        match = _ERROR.match(line[:MAX_LINE])
         if not match:
             return None
         try:

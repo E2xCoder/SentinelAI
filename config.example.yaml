@@ -115,6 +115,13 @@ intel:
   timeout_seconds: 10.0
   max_lookups_per_run: 50    # per-run budget to protect free-tier quotas
 
+  # Cache-only mode (default false; or SENTINELAI_INTEL_OFFLINE=true): no
+  # threat-intel network requests at all. Answers come from the local cache
+  # (<state_dir>/intel_cache.db). Expired entries are still served, tagged
+  # "stale-cache"; when only stale data exists the score is halved. An IP with
+  # nothing cached counts as "not checked". Enabled providers are still needed.
+  # offline: true
+
   abuseipdb:
     enabled: false
     api_key: ""              # prefer SENTINELAI_INTEL_ABUSEIPDB_API_KEY
@@ -184,6 +191,9 @@ firewall:
   init_kwargs: {}            # e.g. {profile: "sentinel"}
 
   # adapter: command — call your project's CLI (no shell; args are a list).
+  #   The subprocess runs with a minimal environment (PATH, LC_ALL, LANG,
+  #   HOME): API keys and webhooks from SentinelAI's environment are not
+  #   inherited.
   command: ""                # e.g. "firewall-automation"
   block_args: ["block", "{ip}"]
   unblock_args: ["unblock", "{ip}"]
@@ -265,3 +275,38 @@ live:
   poll_interval_seconds: 1.0
   from_beginning: false           # true = also process existing content
   dedup_window_seconds: 300
+
+# -----------------------------------------------------------------------------
+# Input limits (applied when log files are read; defaults shown)
+# -----------------------------------------------------------------------------
+# limits:
+#   max_line_chars: 65536           # 1024..16777216; longer lines are skipped
+#                                   # (not truncated), also in `sentinel live`
+#   max_decompressed_mb: 2048       # 1..1048576; a gzip log expanding beyond
+#                                   # this aborts with an error
+
+# -----------------------------------------------------------------------------
+# Notifications for `sentinel digest --send` (no channel is active by default)
+# -----------------------------------------------------------------------------
+# !!! SECRETS NEVER GO IN THIS FILE !!!
+# slack_webhook, telegram_token and email_password MUST come from the
+# environment and must not be written here, not even as placeholders:
+#   SENTINELAI_NOTIFY_SLACK_WEBHOOK=...      (https:// URL)
+#   SENTINELAI_NOTIFY_TELEGRAM_TOKEN=...
+#   SENTINELAI_NOTIFY_EMAIL_PASSWORD=...
+# Put them in /etc/sentinelai/sentinelai-digest.env (root:root, chmod 600),
+# which only the digest unit loads (see deploy/README.md). Only the
+# non-secret settings below belong in the file.
+#
+# notify:
+#   channels: []                    # any of: telegram, slack, email
+#   language: "en"                  # en | tr | de
+#   max_alerts: 10                  # alerts listed in the digest, 1..50
+#   timeout_seconds: 10.0           # per request; > 0 and <= 60
+#   telegram_chat_id: ""            # required when "telegram" is a channel
+#   email_host: ""                  # required when "email" is a channel
+#   email_port: 587                 # 1..65535
+#   email_starttls: true            # a password requires STARTTLS or port 465
+#   email_username: ""              # empty = unauthenticated mail
+#   email_from: ""                  # required when "email" is a channel
+#   email_to: []                    # e.g. ["admin@example.com"]; required for email

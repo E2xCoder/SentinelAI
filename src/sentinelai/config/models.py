@@ -240,8 +240,12 @@ class IntelConfig:
     abuseipdb: IntelProviderConfig = field(default_factory=IntelProviderConfig)
     virustotal: IntelProviderConfig = field(default_factory=IntelProviderConfig)
     otx: IntelProviderConfig = field(default_factory=IntelProviderConfig)
+    #: Cache-only mode: never perform network lookups.
+    offline: bool = False
 
     def validate(self) -> None:
+        if not isinstance(self.offline, bool):
+            raise ConfigError("intel.offline must be a boolean")
         if self.cache_ttl_seconds < 0:
             raise ConfigError("intel.cache_ttl_seconds must not be negative")
         if self.timeout_seconds <= 0:
@@ -495,6 +499,123 @@ class LiveConfig:
 
 
 @dataclass(slots=True)
+class LimitsConfig:
+    """Resource limits applied while reading log files."""
+
+    max_line_chars: int = 65_536
+    max_decompressed_mb: int = 2_048
+
+    def validate(self) -> None:
+        _check_int_range("limits.max_line_chars", self.max_line_chars, 1_024, 16_777_216)
+        _check_int_range("limits.max_decompressed_mb", self.max_decompressed_mb, 1, 1_048_576)
+
+
+_NOTIFY_CHANNELS: tuple[str, ...] = ("telegram", "slack", "email")
+_NOTIFY_LANGUAGES: tuple[str, ...] = ("en", "tr", "de")
+_UNSAFE_ADDRESS_RE = re.compile(r"[\s\x00-\x1f\x7f]")
+
+
+def _check_int_range(name: str, value: Any, low: int, high: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        raise ConfigError(f"{name} must be an integer between {low} and {high}")
+
+
+def _check_address(name: str, value: Any) -> None:
+    """Require a single-``@`` address free of whitespace and control characters."""
+    if (
+        not isinstance(value, str)
+        or value.count("@") != 1
+        or _UNSAFE_ADDRESS_RE.search(value) is not None
+        or value.startswith("@")
+        or value.endswith("@")
+    ):
+        raise ConfigError(
+            f"{name} must be an email address with exactly one '@' "
+            "and no whitespace or control characters"
+        )
+
+
+@dataclass(slots=True)
+class NotifyConfig:
+    """Alert notification channels (Telegram, Slack, email).
+
+    The ``slack_webhook``, ``telegram_token`` and ``email_password`` secrets are
+    meant to come only from ``SENTINELAI_NOTIFY_*`` environment variables and are
+    excluded from ``repr()``. Missing secrets are checked at send time.
+    """
+
+    channels: list[str] = field(default_factory=list)
+    language: str = "en"
+    max_alerts: int = 10
+    timeout_seconds: float = 10.0
+    telegram_chat_id: str = ""
+    email_host: str = ""
+    email_port: int = 587
+    email_starttls: bool = True
+    email_username: str = ""
+    email_from: str = ""
+    email_to: list[str] = field(default_factory=list)
+    slack_webhook: str = field(default="", repr=False)
+    telegram_token: str = field(default="", repr=False)
+    email_password: str = field(default="", repr=False)
+
+    def _validate_channels(self) -> None:
+        if not isinstance(self.channels, list):
+            raise ConfigError("notify.channels must be a list")
+        for channel in self.channels:
+            if channel not in _NOTIFY_CHANNELS:
+                raise ConfigError(
+                    f"notify.channels contains unknown channel {channel!r}; "
+                    f"valid: {', '.join(_NOTIFY_CHANNELS)}"
+                )
+        if "telegram" in self.channels and not self.telegram_chat_id:
+            raise ConfigError("notify.telegram_chat_id is required when telegram is enabled")
+        if "email" in self.channels:
+            if not self.email_host:
+                raise ConfigError("notify.email_host is required when email is enabled")
+            if not self.email_from:
+                raise ConfigError("notify.email_from is required when email is enabled")
+            if not self.email_to:
+                raise ConfigError("notify.email_to must not be empty when email is enabled")
+
+    def validate(self) -> None:
+        if self.language not in _NOTIFY_LANGUAGES:
+            raise ConfigError(f"notify.language must be one of: {', '.join(_NOTIFY_LANGUAGES)}")
+        _check_int_range("notify.max_alerts", self.max_alerts, 1, 50)
+        _check_int_range("notify.email_port", self.email_port, 1, 65_535)
+        timeout = self.timeout_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or not 0 < timeout <= 60
+        ):
+            raise ConfigError("notify.timeout_seconds must be a finite number >0 and <=60")
+        if not isinstance(self.email_starttls, bool):
+            raise ConfigError("notify.email_starttls must be a boolean")
+        for name in (
+            "telegram_chat_id",
+            "email_host",
+            "email_username",
+            "email_from",
+            "slack_webhook",
+            "telegram_token",
+            "email_password",
+        ):
+            if not isinstance(getattr(self, name), str):
+                raise ConfigError(f"notify.{name} must be a string")
+        if self.slack_webhook and not self.slack_webhook.startswith("https://"):
+            raise ConfigError("notify.slack_webhook must be an https:// URL")
+        if self.email_from:
+            _check_address("notify.email_from", self.email_from)
+        if not isinstance(self.email_to, list):
+            raise ConfigError("notify.email_to must be a list of email addresses")
+        for index, address in enumerate(self.email_to):
+            _check_address(f"notify.email_to[{index}]", address)
+        self._validate_channels()
+
+
+@dataclass(slots=True)
 class SentinelConfig:
     """Root configuration object."""
 
@@ -509,6 +630,8 @@ class SentinelConfig:
     report: ReportConfig = field(default_factory=ReportConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
+    limits: LimitsConfig = field(default_factory=LimitsConfig)
+    notify: NotifyConfig = field(default_factory=NotifyConfig)
     source_path: str = ""
     tuning_overlay: str = ""
 
@@ -522,6 +645,8 @@ class SentinelConfig:
         self.report.validate()
         self.live.validate()
         self.risk.validate()
+        self.limits.validate()
+        self.notify.validate()
 
     def resolve_state_dir(self) -> Path:
         """Return the state directory, creating it when needed."""

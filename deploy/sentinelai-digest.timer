@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the SentinelAI daily digest every morning
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+# Catch up after downtime (runs at next boot if the host was off at 07:30).
+Persistent=true
+RandomizedDelaySec=300
+Unit=sentinelai-digest.service
+
+[Install]
+WantedBy=timers.target

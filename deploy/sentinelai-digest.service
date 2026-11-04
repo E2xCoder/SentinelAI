@@ -1,0 +1,55 @@
+[Unit]
+Description=SentinelAI daily digest (Telegram/Slack/email)
+Documentation=https://github.com/E2xCoder/SentinelAI
+After=network-online.target
+Wants=network-online.target
+
+# Triggered by sentinelai-digest.timer. Same sandbox as sentinelai.service,
+# except that it reads no logs (no adm group, no /var/log): it only reads the
+# state directory and holds the notification secrets. Write access only to the
+# state directory, no capabilities.
+
+[Service]
+Type=oneshot
+User=sentinelai
+Group=sentinelai
+
+# Adjust the path to your install (see sentinelai.service).
+ExecStart=/usr/local/bin/sentinel --config /etc/sentinelai/config.yaml digest --send
+
+# ONLY the notification secrets (Telegram token, Slack webhook, email password).
+# Kept separate from sentinelai.env so the live daemon never sees them.
+EnvironmentFile=-/etc/sentinelai/sentinelai-digest.env
+Environment=SENTINELAI_STATE_DIR=/var/lib/sentinelai
+Environment=PYTHONUNBUFFERED=1
+StateDirectory=sentinelai
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/sentinelai
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/sentinelai
+UMask=0077
+ProtectProc=invisible
+ProcSubset=pid
+
+# Resource limits
+MemoryMax=256M
+TasksMax=32
+TimeoutStartSec=120

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -14,6 +15,19 @@ from sentinelai.cli.common import build_pipeline, fail, load_context
 from sentinelai.config.models import SentinelConfig
 from sentinelai.core.exceptions import SentinelError
 from sentinelai.core.models import Alert
+
+if TYPE_CHECKING:
+    from sentinelai.parsers.reader import ReaderLimits
+
+
+def limits_from_config(config: SentinelConfig) -> ReaderLimits:
+    """Build reader limits from the configured ``limits`` section."""
+    from sentinelai.parsers.reader import ReaderLimits
+
+    return ReaderLimits(
+        max_line_chars=config.limits.max_line_chars,
+        max_decompressed_bytes=config.limits.max_decompressed_mb * 1024 * 1024,
+    )
 
 
 @click.command()
@@ -48,12 +62,13 @@ def analyze(ctx: click.Context, logfile: str, parser_name: str | None) -> None:
     """Parse a log file and show event statistics (no detection)."""
     from sentinelai.parsers.reader import read_events
 
+    limits = limits_from_config(load_context(ctx).config)
     events = 0
     categories: Counter[str] = Counter()
     severities: Counter[str] = Counter()
     ips: Counter[str] = Counter()
     try:
-        for event in read_events(logfile, parser_name=parser_name):
+        for event in read_events(logfile, parser_name=parser_name, limits=limits):
             events += 1
             categories[event.category.value] += 1
             severities[event.severity.value] += 1
@@ -101,7 +116,11 @@ def replay(ctx: click.Context, logfile: str, speed: float, parser_name: str | No
     try:
         replayer = LogReplayer(pipeline, speed=speed, on_alert=on_alert)
         ui.console.print(f"[cyan]Replaying {logfile} at {speed}x…[/cyan]")
-        replayer.replay(read_events(logfile, parser_name=parser_name))
+        replayer.replay(
+            read_events(
+                logfile, parser_name=parser_name, limits=limits_from_config(context.config)
+            )
+        )
         ui.console.print(
             f"[green]Done.[/green] {replayer.events_replayed:,} events, "
             f"{replayer.alerts_raised} alerts."
@@ -139,7 +158,12 @@ def live(ctx: click.Context, from_beginning: bool, paths: tuple[str, ...]) -> No
             f"(risk {alert.risk.score:.0f}, ip {alert.ip or 'n/a'})"
         )
 
-    monitor = LiveMonitor(config.live, pipeline, on_alert=on_alert)
+    monitor = LiveMonitor(
+        config.live,
+        pipeline,
+        on_alert=on_alert,
+        max_line_chars=config.limits.max_line_chars,
+    )
     ui.print_banner()
     ui.console.print(
         f"[cyan]Watching {len(config.live.paths)} log(s). Press Ctrl-C to stop.[/cyan]"
@@ -176,7 +200,10 @@ def run_scan(
         ) as progress:
             progress.add_task(Path(logfile).name, total=None)
             result = pipeline.run_scan(
-                read_events(logfile, parser_name=parser_name), use_ai=use_ai
+                read_events(
+                    logfile, parser_name=parser_name, limits=limits_from_config(config)
+                ),
+                use_ai=use_ai,
             )
         report_formats = formats or config.report.formats
         report_obj = build_report(

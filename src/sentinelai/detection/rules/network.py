@@ -1,26 +1,31 @@
 """Network attack detections: scanning, reverse shells, lateral movement."""
 
+# ReDoS hardening: \s+ before a [^\n]* gap is forced maximal and "gap then token" pairs are
+# resolved once via lookahead (atomic), so failures cannot re-scan the line per split point.
+
 from __future__ import annotations
 
 import re
 
 from sentinelai.core.models import Alert, EventCategory, EventType, LogEvent, Severity
 from sentinelai.detection.base import Rule, RuleContext, register_rule
+from sentinelai.utils.regex import search_windowed
 
 #: Command patterns strongly associated with reverse/bind shells.
 _REVERSE_SHELL = re.compile(
     r"""
     (?:
-        (?:nc|ncat|netcat)\s+(?:[^\n]*\s)?-{1,2}\S*e\b   # nc -e /bin/sh
+        (?:nc|ncat|netcat)\s+(?!\s)(?:[^\n]*\s)?-{1,2}\S*e\b   # nc -e /bin/sh
         | bash\s+-i\s+>&\s*/dev/tcp/                     # bash -i >& /dev/tcp/ip/port
         | /dev/tcp/\d{1,3}(?:\.\d{1,3}){3}/\d+            # any /dev/tcp connect-back
-        | socat\s+[^\n]*exec:                             # socat ... EXEC:
-        | python[\d.]*\s+-c\s+[^\n]*socket[^\n]*(?:subprocess|pty|os\.dup2)
-        | perl\s+-e\s+[^\n]*socket[^\n]*exec
-        | php\s+-r\s+[^\n]*fsockopen
+        | socat\s+(?!\s)[^\n]*exec:                       # socat ... EXEC:
+        | python[\d.]*\s+-c\s+(?!\s)
+          (?=(?P<_py_sock>[^\n]*?socket))(?P=_py_sock)[^\n]*(?:subprocess|pty|os\.dup2)
+        | perl\s+-e\s+(?!\s)(?=(?P<_pl_sock>[^\n]*?socket))(?P=_pl_sock)[^\n]*exec
+        | php\s+-r\s+(?!\s)[^\n]*fsockopen
         | ruby\s+-rsocket
-        | mkfifo\s+\S+\s*;?\s*(?:nc|cat)                  # mkfifo pipe shells
-        | rm\s+\S*/tmp/\S+;\s*mkfifo
+        | mkfifo\s+\S+\s*(?:;\s*)?(?:nc|cat)              # mkfifo pipe shells
+        | rm\s+(?=(?P<_rm_tmp>\S*?/tmp/))(?P=_rm_tmp)\S+;\s*mkfifo
     )
     """,
     re.VERBOSE | re.IGNORECASE,
@@ -107,7 +112,8 @@ class ReverseShellRule(Rule):
 
     def evaluate(self, event: LogEvent, ctx: RuleContext) -> Alert | None:
         text = _command_text(event)
-        match = _REVERSE_SHELL.search(text)
+        # Windowed search: bounds the per-line rescan cost (quadratic on repeated command words).
+        match = search_windowed(_REVERSE_SHELL, text)
         if not match:
             return None
         return self.make_alert(

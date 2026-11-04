@@ -1,16 +1,20 @@
 """Persistence detections: cron abuse, SSH key manipulation, autostarts."""
 
+# ReDoS hardening: \s+ before the [^\n|;]* gap is forced maximal so a failed
+# match cannot re-scan per split.
+
 from __future__ import annotations
 
 import re
 
 from sentinelai.core.models import Alert, EventCategory, EventType, LogEvent, Severity
 from sentinelai.detection.base import Rule, RuleContext, register_rule
+from sentinelai.utils.regex import search_windowed
 
 _SUSPICIOUS_CRON_CMD = re.compile(
     r"""
     (?:
-        (?:curl|wget)\s+[^\n|;]*\|\s*(?:ba)?sh      # download piped to shell
+        (?:curl|wget)\s+(?!\s)[^\n|;]*\|\s*(?:ba)?sh      # download piped to shell
         | base64\s+(?:-d|--decode)                  # encoded payloads
         | /tmp/[^\s;|]+                             # executing from /tmp
         | /dev/shm/[^\s;|]+                         # executing from tmpfs
@@ -71,7 +75,8 @@ class SuspiciousCronRule(Rule):
     def evaluate(self, event: LogEvent, ctx: RuleContext) -> Alert | None:
         if event.event_type is EventType.CRON_JOB:
             command = str(event.extra.get("command", ""))
-            match = _SUSPICIOUS_CRON_CMD.search(command)
+            # Windowed search: bounds the per-line rescan cost (quadratic on repeated curl/wget).
+            match = search_windowed(_SUSPICIOUS_CRON_CMD, command)
             if match:
                 return self.make_alert(
                     event,

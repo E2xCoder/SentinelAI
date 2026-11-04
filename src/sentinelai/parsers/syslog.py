@@ -5,6 +5,8 @@ and the RFC 3339 header modern rsyslog emits
 (``2024-01-07T03:14:15.123456+02:00 host sshd[42]:``).
 """
 
+# ReDoS hardening: header regexes only ever see line[:_MAX_LINE]; raw keeps the full line.
+
 from __future__ import annotations
 
 import re
@@ -30,6 +32,9 @@ _HEADER_ISO = re.compile(
 
 _ROOT_USERS = frozenset({"root"})
 
+#: Upper bound on the line length handed to the regex engine.
+_MAX_LINE = 8192
+
 
 @register_parser
 class SyslogParser(LogParser):
@@ -45,7 +50,7 @@ class SyslogParser(LogParser):
         hits = sum(
             1
             for line in sample_lines
-            if _HEADER_BSD.match(line) or _HEADER_ISO.match(line)
+            if _HEADER_BSD.match(line[:_MAX_LINE]) or _HEADER_ISO.match(line[:_MAX_LINE])
         )
         # Syslog is the generic base format: dedicated formats such as UFW
         # (kernel netfilter messages) are *also* valid syslog. Scale the
@@ -54,7 +59,8 @@ class SyslogParser(LogParser):
         return 0.9 * (hits / len(sample_lines))
 
     def parse_line(self, line: str) -> LogEvent | None:
-        match = _HEADER_BSD.match(line) or _HEADER_ISO.match(line)
+        text = line[:_MAX_LINE]
+        match = _HEADER_BSD.match(text) or _HEADER_ISO.match(text)
         if not match:
             return None
         ts_raw = match.group("ts")

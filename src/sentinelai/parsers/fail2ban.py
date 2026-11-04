@@ -5,6 +5,8 @@ Example line::
     2024-01-07 03:14:15,123 fail2ban.actions [123]: NOTICE [sshd] Ban 1.2.3.4
 """
 
+# ReDoS hardening: regexes reviewed (disjoint quantifiers, anchored) and only see line[:_MAX_LINE].
+
 from __future__ import annotations
 
 import re
@@ -12,6 +14,9 @@ from datetime import datetime, timezone
 
 from sentinelai.core.models import EventCategory, EventType, LogEvent, Severity
 from sentinelai.parsers.base import LogParser, register_parser
+
+#: Upper bound on the line length handed to the regex engine.
+_MAX_LINE = 8192
 
 _LINE = re.compile(
     r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:,\d+)?\s+"
@@ -53,10 +58,10 @@ class Fail2BanParser(LogParser):
     def match_score(self, sample_lines: list[str]) -> float:
         if not sample_lines:
             return 0.0
-        return sum(1 for line in sample_lines if _LINE.match(line)) / len(sample_lines)
+        return sum(1 for line in sample_lines if _LINE.match(line[:_MAX_LINE])) / len(sample_lines)
 
     def parse_line(self, line: str) -> LogEvent | None:
-        match = _LINE.match(line)
+        match = _LINE.match(line[:_MAX_LINE])
         if not match:
             return None
         try:

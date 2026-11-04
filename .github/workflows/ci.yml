@@ -38,3 +38,16 @@ jobs:
 
       - name: Detection benchmark (regression gate)
         run: sentinel eval --baseline benchmarks/baseline.json
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t sentinelai:ci .
+
+      - name: Smoke test image
+        run: |
+          docker run --rm sentinelai:ci version
+          docker run --rm sentinelai:ci doctor --json || test $? -eq 1

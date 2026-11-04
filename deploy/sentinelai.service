@@ -1,0 +1,76 @@
+[Unit]
+Description=SentinelAI live log monitoring
+Documentation=https://github.com/E2xCoder/SentinelAI
+After=network-online.target
+Wants=network-online.target
+
+# IMPORTANT - what this unit deliberately cannot do
+# --------------------------------------------------
+# Automatic blocking needs privileges (CAP_NET_ADMIN / root / sudo for the
+# firewall tool) that this unit does NOT have: no capabilities, no new
+# privileges, no write access outside the state directory. Therefore keep
+#   response.enabled: false
+# in /etc/sentinelai/config.yaml. The default firewall adapter is dry_run, which
+# only records what it would do. If you want real blocking, use
+# response.mode: approval and run the firewall tool through a separate
+# privileged helper (e.g. a narrow sudoers rule for that single command),
+# outside this sandbox. Do not loosen the hardening below to make it work.
+
+[Service]
+Type=simple
+User=sentinelai
+Group=sentinelai
+# adm group = read access to /var/log/auth.log, syslog on Debian/Ubuntu.
+SupplementaryGroups=adm
+
+# Adjust the path to your install: /usr/local/bin (pip), /root/.local/bin is NOT
+# readable by this user (ProtectHome) so copy/install elsewhere, or use a
+# system-wide venv such as /opt/sentinelai/bin/sentinel.
+ExecStart=/usr/local/bin/sentinel --config /etc/sentinelai/config.yaml live
+
+# Threat-intel keys and generic settings live here, not in config.yaml.
+# "-" = optional file. Notification secrets (Telegram/Slack/email) are
+# deliberately NOT loaded here: only sentinelai-digest.service gets them, so the
+# always-on log-parsing daemon never holds them.
+EnvironmentFile=-/etc/sentinelai/sentinelai.env
+Environment=SENTINELAI_STATE_DIR=/var/lib/sentinelai
+Environment=PYTHONUNBUFFERED=1
+StateDirectory=sentinelai
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/sentinelai
+
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# If the [ai] extra (numpy/scikit-learn) fails to start under this setting,
+# test with MemoryDenyWriteExecute=no before relaxing anything else.
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/sentinelai
+ReadOnlyPaths=/var/log
+UMask=0077
+ProtectProc=invisible
+ProcSubset=pid
+
+# Resource limits
+MemoryMax=1G
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

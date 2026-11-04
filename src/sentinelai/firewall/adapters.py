@@ -15,6 +15,7 @@ contains zero firewall logic:
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess  # noqa: S404 - used without shell, args validated
 from typing import Any
 
@@ -147,11 +148,25 @@ class CommandAdapter:
           list_args: ["list", "--plain"]
 
     Substitution only fills ``{ip}`` / ``{duration}`` into pre-split
-    argument slots; nothing is ever interpreted by a shell.
+    argument slots; nothing is ever interpreted by a shell. The tool runs
+    with a minimal environment (PATH, locale, HOME), so API keys, webhooks
+    and passwords from SentinelAI's own environment are not inherited.
     """
 
     def __init__(self, config: FirewallConfig) -> None:
         self._config = config
+
+    @staticmethod
+    def _minimal_env() -> dict[str, str]:
+        env = {
+            "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
+            "LC_ALL": "C",
+            "LANG": "C",
+        }
+        home = os.environ.get("HOME")
+        if home:
+            env["HOME"] = home
+        return env
 
     def _run(self, template: list[str], **values: str) -> subprocess.CompletedProcess[str]:
         args = [self._config.command]
@@ -168,6 +183,7 @@ class CommandAdapter:
                 timeout=self._config.timeout_seconds,
                 shell=False,
                 check=False,
+                env=self._minimal_env(),
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise FirewallError(f"Firewall command failed to run: {exc}") from exc

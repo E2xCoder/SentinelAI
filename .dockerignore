@@ -1,0 +1,42 @@
+# VCS / editor / tooling
+.git
+.gitignore
+.github
+.claude/
+.vscode
+.idea
+graphify-out/
+
+# Python artefacts
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+build
+dist
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Not needed in the runtime image
+tests
+benchmarks
+reports
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+docs/*.gif
+docs/*.svg
+linux-firewall-automation-main/
+deploy/
+
+# State and secrets must never be baked into an image
+*.db
+*.sqlite*
+config.yaml
+sentinelai.yaml
+.env
+*.env

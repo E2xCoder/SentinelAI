@@ -322,6 +322,52 @@ class AlertStore:
             raise StorageError(f"Failed to list alerts: {exc}") from exc
         return [_alert_from_payload(json.loads(payload), alert_id) for alert_id, payload in rows]
 
+    def alerts_since(self, since: datetime, limit: int = 500) -> list[Alert]:
+        """Alerts created at or after *since*, highest risk first (ties: newest first)."""
+        try:
+            rows = self._conn.execute(
+                "SELECT id, payload FROM alerts WHERE created_at >= ? "
+                "ORDER BY risk_score DESC, id DESC LIMIT ?",
+                (_utc_iso(since), max(0, int(limit))),
+            ).fetchall()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to list alerts: {exc}") from exc
+        return [_alert_from_payload(json.loads(payload), alert_id) for alert_id, payload in rows]
+
+    def count_alerts_by_level_since(self, since: datetime) -> dict[str, int]:
+        """Exact number of alerts per risk level created at or after *since*."""
+        try:
+            rows = self._conn.execute(
+                "SELECT risk_level, COUNT(*) FROM alerts WHERE created_at >= ? "
+                "GROUP BY risk_level",
+                (_utc_iso(since),),
+            ).fetchall()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to count alerts: {exc}") from exc
+        return {str(level): int(count) for level, count in rows}
+
+    def count_alerts_since(self, since: datetime) -> int:
+        """Exact number of alerts created at or after *since*."""
+        try:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM alerts WHERE created_at >= ?", (_utc_iso(since),)
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to count alerts: {exc}") from exc
+        return int(row[0])
+
+    def latest_alert_time(self) -> datetime | None:
+        """Creation time of the most recently stored alert, or ``None`` if there is none."""
+        try:
+            row = self._conn.execute(
+                "SELECT created_at FROM alerts ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise StorageError(f"Failed to read latest alert time: {exc}") from exc
+        if row is None:
+            return None
+        return _parse_stored_ts(row[0])
+
     # -- feedback ---------------------------------------------------------
 
     def add_feedback(

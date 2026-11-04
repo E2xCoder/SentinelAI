@@ -29,10 +29,14 @@ firewall automation through a clean adapter boundary.
 - [Structured LLM triage](#structured-llm-triage)
 - [Firewall integration](#firewall-integration)
 - [Safe automated response](#safe-automated-response)
+- [Daily digest](#daily-digest)
+- [Hardening and limits](#hardening-and-limits)
+- [Deployment](#deployment)
 - [Development guide](#development-guide)
 - [Extending SentinelAI](#extending-sentinelai)
 - [Contributing](#contributing)
 - [Screenshots](#screenshots)
+- [Project documents](#project-documents)
 - [License](#license)
 
 ---
@@ -59,8 +63,14 @@ firewall automation through a clean adapter boundary.
   project via dependency inversion; SentinelAI never implements firewall logic.
 - **Live monitoring & replay** — rotation-aware tailing and historical replay.
 - **Reports** — JSON, CSV and self-contained HTML.
+- **Onboarding** — `sentinel init` writes a config for your host and
+  `sentinel doctor` checks the environment.
+- **Daily digest** — a plain-language alert summary to Telegram, Slack or email
+  (see [Daily digest](#daily-digest)).
 - **Plugin system** — drop a `.py` file in the plugins directory to add parsers,
-  rules, models or report formats with zero core changes.
+  rules, models or report formats with zero core changes (see
+  [docs/PLUGINS.md](docs/PLUGINS.md); plugins run unsandboxed with your
+  privileges).
 
 ---
 
@@ -117,6 +127,8 @@ Packages (`src/sentinelai/`):
 | `evaluation` | Frozen benchmark runner, metrics, baseline comparison      |
 | `tuning`     | Feedback-driven proposals, policy limits, gate, overlay    |
 | `search`     | Composable event query/filter engine                       |
+| `setup`      | Host detection and environment diagnostics (`init`, `doctor`) |
+| `notify`     | Digest builder and Telegram/Slack/email notifiers          |
 | `plugins`    | Directory-based plugin loader                              |
 | `cli`        | click + rich command-line interface                        |
 | `utils`      | Logging, time parsing, network & path helpers              |
@@ -149,6 +161,30 @@ This installs the `sentinel` command.
 ---
 
 ## Quick start
+
+### Getting started in 5 minutes
+
+```bash
+pip install -e ".[ai]"       # see Installation; "pip install -e ." skips anomaly detection
+
+sentinel init                # detect this host, write a validated config.yaml
+sentinel doctor              # check logs, state dir, LLM, firewall, notifications
+sentinel scan /var/log/auth.log
+sentinel live                # monitor the configured logs in real time
+```
+
+- `sentinel init` never prompts. It looks for common log files and tools, writes
+  `config.yaml` to the current directory with owner-only permissions and prints
+  the next steps. Automatic blocking stays **off**. Options: `--output <path>`,
+  `--force` (overwrite), `--dry-run` (print, write nothing), `--state-dir`,
+  `--llm/--no-llm` and `--llm-model` (the local LLM block is off by default).
+- `sentinel doctor` prints a table of OK / WARN / FAIL checks with hints and
+  exits with code 1 only if a check failed. `--json` prints the results as a
+  list. Secrets are never shown, only whether they are present.
+- Reading `/var/log/auth.log` usually needs the `adm` group on Debian/Ubuntu;
+  `doctor` tells you if a log is not readable.
+
+### More commands
 
 ```bash
 # Analyze the bundled example attack log:
@@ -205,6 +241,8 @@ sentinel config
 
 | Command                    | Description                                              |
 |----------------------------|----------------------------------------------------------|
+| `sentinel init`            | Generate a `config.yaml` for this host (never prompts; see [Quick start](#getting-started-in-5-minutes)) |
+| `sentinel doctor`          | Check the environment; exit code 1 if a check failed     |
 | `sentinel scan <log>`      | Analyze a log and report detected threats                |
 | `sentinel analyze <log>`   | Parse and show event statistics (no detection)           |
 | `sentinel live`            | Continuously monitor configured logs in real time        |
@@ -219,6 +257,7 @@ sentinel config
 | `sentinel review`          | Interactively label recent, unlabelled alerts            |
 | `sentinel tune`            | Propose, gate and (`--apply`) apply feedback-driven tuning |
 | `sentinel respond`         | Review, approve, deny, reap and roll back firewall responses (see [Safe automated response](#safe-automated-response)) |
+| `sentinel digest`          | Print (and with `--send` deliver) a plain-language alert summary (see [Daily digest](#daily-digest)) |
 | `sentinel config`          | Show effective configuration and component status        |
 | `sentinel version`         | Show the version                                         |
 
@@ -825,6 +864,9 @@ at runtime via one of three adapters:
     block_args: ["block", "{ip}"]
     temp_block_args: ["block", "{ip}", "--duration", "{duration}"]
   ```
+  The subprocess runs with a minimal environment (`PATH`, `LC_ALL`, `LANG`,
+  `HOME`), so API keys, webhooks and other secrets from SentinelAI's own
+  environment are not inherited by your firewall tool.
 - **`dry_run`** — the safe default; logs intended actions without touching anything.
 
 Automatic response (off by default) only acts above a configurable risk level,
@@ -1141,6 +1183,294 @@ are unchanged. New keys:
 
 ---
 
+## Daily digest
+
+`sentinel digest` turns the stored alerts of the last hours into a short,
+plain-language summary: counts by risk level, the top alerts by risk score, the
+most active source addresses, firewall activity and what to do next. It reads
+the alert store (`<state_dir>/alerts.db`), so run `sentinel scan` or
+`sentinel live` first. It reads no log files.
+
+- Total and per-level counts are exact (counted in SQL). The listed alerts and
+  the source-address ranking are taken from at most 500 alerts of the period,
+  sorted by risk score; the digest says how many alerts are not shown.
+- A liveness line shows the time (UTC) of the last recorded alert, even when it
+  is older than the period, or that no alert was ever recorded in this state
+  directory. A quiet digest can therefore mean "nothing happened" or "nothing is
+  monitoring"; check this line.
+
+```bash
+sentinel digest                          # print the last 24 hours; nothing is sent
+sentinel digest --hours 6 --language de  # last 6 hours, German
+sentinel digest --send                   # deliver through the configured channels
+sentinel digest --send --channel slack   # only this channel (repeatable)
+```
+
+Without `--send` the digest is only printed. With `--send` it goes to every
+channel in `notify.channels`; the exit code is 1 if any channel failed. If any
+configured channel lacks a secret or setting, the command fails and nothing is
+sent.
+
+| Option                  | Description                                                     |
+|-------------------------|-----------------------------------------------------------------|
+| `--hours <n>`           | How many hours back to summarise, 1..720 (default `24`)         |
+| `--language en\|tr\|de` | Language of the digest (default: `notify.language`)             |
+| `--send`                | Send through the configured channels                            |
+| `--channel <name>`      | With `--send`: only this channel; must be in `notify.channels` (repeatable) |
+
+### Channels and configuration
+
+Channels are `telegram`, `slack` and `email`. Non-secret settings live in the
+`notify` section of `config.yaml`:
+
+```yaml
+notify:
+  channels: [telegram, slack, email]   # any subset; empty = nothing to send to
+  language: en                         # en | tr | de
+  max_alerts: 10                       # alerts listed in the digest, 1..50
+  timeout_seconds: 10.0                # per request, above 0 and at most 60
+  telegram_chat_id: "123456789"
+  email_host: smtp.example.com
+  email_port: 587
+  email_starttls: true
+  email_username: sentinel@example.com
+  email_from: sentinel@example.com
+  email_to: [admin@example.com]
+```
+
+Secrets are meant to come **only from the environment**, so they never live in
+`config.yaml`:
+
+| Variable                           | Used for                                      |
+|------------------------------------|-----------------------------------------------|
+| `SENTINELAI_NOTIFY_TELEGRAM_TOKEN` | Telegram bot token (the chat id is in the config) |
+| `SENTINELAI_NOTIFY_SLACK_WEBHOOK`  | Slack incoming-webhook URL (must be `https://`) |
+| `SENTINELAI_NOTIFY_EMAIL_PASSWORD` | SMTP password (when `email_username` is set)  |
+
+```bash
+export SENTINELAI_NOTIFY_SLACK_WEBHOOK="https://hooks.slack.example/REPLACE_ME"
+sentinel doctor          # reports missing notify settings without printing secrets
+```
+
+Details:
+
+- The digest is plain text. Text that comes from logs (rule names, IPs, user
+  names) is treated as untrusted: control characters are removed, `<` and `>`
+  are dropped, `://` is defanged so nothing becomes a link, every field is
+  length-capped, and the body is capped at 3500 characters.
+- Telegram and Slack requests do not follow redirects, ignore proxy environment
+  variables and `~/.netrc`, and read at most 64 KB of a response. Error messages
+  never contain tokens, webhook URLs, passwords or the message body.
+- Email with a password requires TLS: STARTTLS (`email_starttls: true`) or port
+  465. Without `email_username`, mail is sent unauthenticated and `doctor` warns.
+
+### Running it daily
+
+[`deploy/sentinelai-digest.timer`](deploy/sentinelai-digest.timer) runs
+[`deploy/sentinelai-digest.service`](deploy/sentinelai-digest.service)
+(`sentinel digest --send`) every day at 07:30 with up to 5 minutes of random
+delay, and catches up after downtime (`Persistent=true`). See
+[Deployment](#deployment). Without systemd, use cron or any scheduler:
+`sentinel digest --send`.
+
+The digest unit loads its own env file,
+`/etc/sentinelai/sentinelai-digest.env`, which holds the three notification
+secrets above. The live daemon loads `/etc/sentinelai/sentinelai.env`
+(threat-intel keys only) and never sees them. Both files: owner `root`,
+`chmod 600`. The digest unit reads no logs (no `adm` group, no `/var/log`).
+
+---
+
+## Hardening and limits
+
+Log files are written by whoever can reach the monitored host, so SentinelAI
+bounds what it reads. See also [SECURITY.md](SECURITY.md).
+
+### Input limits
+
+```yaml
+limits:
+  max_line_chars: 65536       # 1024..16777216
+  max_decompressed_mb: 2048   # 1..1048576
+```
+
+| Key                          | Default | Effect                                                          |
+|------------------------------|---------|-----------------------------------------------------------------|
+| `limits.max_line_chars`      | `65536` | Longer lines are skipped (not truncated). One warning per file with the count. `sentinel live` applies the same cap to appended lines. |
+| `limits.max_decompressed_mb` | `2048`  | A gzip log that expands beyond this size aborts with an error ("exceeds the decompression limit"). |
+
+The limits apply when files are read by `scan`, `analyze`, `replay`, `search`
+and `live`. Memory per line stays bounded by `max_line_chars`, and files are
+always streamed.
+
+### Regex windows
+
+The parsers' regular expressions only see a bounded prefix of each line. Access
+logs (Apache, Nginx) are matched up to 64 KiB; the other parsers cap regex input
+at 8 KiB (8192 characters for the syslog parser), and the syslog message
+classifier works on at most 4096 characters of the message. The full line stays
+in the event's `raw` field. Patterns have bounded gaps, and token scans are
+anchored so they cannot backtrack catastrophically. The consequence: content
+placed after the window in a very long line is not classified.
+
+Detection-rule regexes over command text are searched in overlapping 2 KiB
+windows (512 characters of overlap) instead of one scan over the whole text.
+Padding therefore cannot push a command out of sight: it is still found in some
+window. Limit: a single command pattern whose match is longer than 512
+characters can be cut at a window edge and missed (see
+[SECURITY.md](SECURITY.md)).
+
+### Live tailing
+
+`sentinel live` reads each file in binary mode and tracks real byte offsets.
+Rotation is detected by an inode change and truncation by the file becoming
+smaller than the stored offset, so multi-byte UTF-8 content cannot confuse the
+check. Oversized lines are dropped (see `limits.max_line_chars`) with a warning
+at most once a minute.
+
+### ReDoS review and fuzz tests
+
+The parser, classifier and detection-rule regexes were reviewed for catastrophic
+backtracking. `tests/test_redos.py` feeds adversarial input to them and checks
+that each call finishes within a time budget and that run time does not blow up
+when the input grows tenfold. `tests/test_fuzz_parsers.py` uses
+[hypothesis](https://hypothesis.readthedocs.io/) (part of the `dev` extra) to
+check that parsers and the classifier never raise on arbitrary text, that
+`match_score` stays within 0..1, and that the reader only raises
+`LogSourceError` and never yields over-long lines. These tests reduce the
+risk; they do not prove its absence.
+
+### Offline intel mode
+
+```yaml
+intel:
+  offline: true     # or: export SENTINELAI_INTEL_OFFLINE=true
+```
+
+In offline mode SentinelAI makes **no** threat-intelligence network requests. It
+answers from the local cache (`<state_dir>/intel_cache.db`) only:
+
+- Cached entries are used even after their TTL has expired, and the reputation is
+  tagged `stale-cache`. When all entries used for an IP are expired (or
+  unreadable), the score is halved. Expired rows are not deleted.
+- An IP with nothing cached is treated as "not checked", the same as with intel
+  disabled. The per-run lookup budget is not used.
+- The providers you want to read from must still be enabled in the config.
+  Private and reserved addresses are never looked up, online or offline.
+
+`sentinel doctor` reports when offline mode is active.
+
+---
+
+## Deployment
+
+### pipx
+
+From a checkout, install the `sentinel` command into its own environment:
+
+```bash
+pipx install .            # core only
+pipx install ".[ai]"      # with Isolation Forest anomaly detection
+```
+
+### Docker
+
+The [`Dockerfile`](Dockerfile) builds a two-stage image that runs as a non-root
+user (UID/GID 10001) with no compilers in the final stage. State lives in
+`/var/lib/sentinelai`, which is a volume.
+
+```bash
+docker build -t sentinelai .
+docker build -t sentinelai:ai --build-arg EXTRAS=ai .     # with the [ai] extra
+```
+
+One-off scan, with the host logs mounted read-only and the state in a named
+volume:
+
+```bash
+docker run --rm \
+  --read-only --cap-drop=ALL --security-opt no-new-privileges \
+  -v /var/log:/host/log:ro \
+  -v sentinelai-state:/var/lib/sentinelai \
+  sentinelai scan /host/log/auth.log
+```
+
+The container user must be able to read the files: grant access with a group or
+ACL on the host, or add `--group-add <gid of adm>`.
+
+`--read-only` makes the container's root filesystem read-only, so a writable
+volume is required for the state directory (`/var/lib/sentinelai`, the named
+volume above); without it SentinelAI cannot write its database and caches.
+
+Continuous monitoring, with a config and an env file for secrets (threat-intel
+keys only; notification secrets belong to the digest, see
+[Daily digest](#running-it-daily)):
+
+```bash
+docker run -d --name sentinelai --restart unless-stopped \
+  --read-only --cap-drop=ALL --security-opt no-new-privileges \
+  -v /var/log:/host/log:ro \
+  -v sentinelai-state:/var/lib/sentinelai \
+  -v /etc/sentinelai/config.yaml:/etc/sentinelai/config.yaml:ro \
+  --env-file /etc/sentinelai/sentinelai.env \
+  sentinelai --config /etc/sentinelai/config.yaml live
+```
+
+Set `live.paths` in that config to the `/host/log/...` paths. The container has
+no firewall privileges, so keep `response.enabled: false` in it. CI builds the
+image and runs `version` and `doctor --json` as a smoke test.
+
+### systemd
+
+[`deploy/`](deploy/) contains:
+
+| File                                | Purpose                                           |
+|-------------------------------------|---------------------------------------------------|
+| `sentinelai.service`                | `sentinel live` as a hardened service             |
+| `sentinelai-digest.service` + `.timer` | Daily digest at 07:30                          |
+| `sentinelai.env.example`            | Template for the live daemon: threat-intel keys only (fake placeholders) |
+| `sentinelai-digest.env.example`     | Template for the digest: notification secrets only (fake placeholders) |
+| `deploy/README.md`                  | Step-by-step install, pipx notes, verification    |
+
+In short (full steps in [`deploy/README.md`](deploy/README.md)):
+
+```bash
+sudo python3 -m venv /opt/sentinelai
+sudo /opt/sentinelai/bin/pip install '.[ai]'
+sudo ln -s /opt/sentinelai/bin/sentinel /usr/local/bin/sentinel
+sudo useradd --system --home-dir /var/lib/sentinelai --shell /usr/sbin/nologin sentinelai
+
+sudo install -d -m 0755 /etc/sentinelai
+sudo install -m 0644 config.example.yaml /etc/sentinelai/config.yaml
+sudo install -o root -g root -m 0600 deploy/sentinelai.env.example /etc/sentinelai/sentinelai.env
+sudo install -o root -g root -m 0600 deploy/sentinelai-digest.env.example /etc/sentinelai/sentinelai-digest.env
+
+sudo cp deploy/sentinelai.service deploy/sentinelai-digest.service \
+        deploy/sentinelai-digest.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sentinelai.service sentinelai-digest.timer
+```
+
+The units run as the unprivileged `sentinelai` user (plus the `adm` group for
+`/var/log`), with `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, an
+empty capability set, `/var/log` read-only and write access only to
+`/var/lib/sentinelai`. Because they have no capabilities they **cannot block
+IPs**: keep `response.enabled: false`.
+
+Two env files keep secrets apart: `/etc/sentinelai/sentinelai.env`
+(threat-intel keys) is loaded by the live service, and
+`/etc/sentinelai/sentinelai-digest.env` (notification secrets) only by the
+digest unit. Both are `root:root`, `chmod 600`. The digest unit reads no logs.
+Details: [`deploy/README.md`](deploy/README.md).
+
+> **Honest note:** the systemd units and timer have **not been run on a live
+> systemd host**. Treat them as a reviewed starting point, and check them with
+> `systemd-analyze verify` and `systemd-analyze security sentinelai.service`.
+> `MemoryDenyWriteExecute=yes` may break numpy/scikit-learn on some builds; if
+> so, set it to `no` for that unit only.
+
+---
+
 ## Development guide
 
 ```bash
@@ -1207,6 +1537,17 @@ class MyRule(Rule):
 **A custom report format:** `register_renderer("fmt", my_renderer)`.
 **A custom risk factor:** implement `RiskFactorEvaluator` + `engine.add_factor(...)`.
 
+Rules, parsers and anomaly models work from a plugin file. A custom report
+format or risk factor is available to code that embeds SentinelAI as a library;
+the CLI does not expose them. Full guide with working code, load behavior
+and testing: [docs/PLUGINS.md](docs/PLUGINS.md), with a complete example in
+[`examples/plugins/example_rule.py`](examples/plugins/example_rule.py).
+
+> **Trust warning:** plugins are ordinary Python imported into the SentinelAI
+> process. They run with your privileges and are **not sandboxed**. Only install
+> plugin code you trust. The systemd unit's hardening limits, but does not
+> remove, the risk. `--no-plugins` skips loading.
+
 ---
 
 ## Contributing
@@ -1219,17 +1560,55 @@ class MyRule(Rule):
 5. Open a pull request describing the behavior change and any new config keys.
 
 Bug reports and rule contributions (with a sample log line that triggers them)
-are especially welcome.
+are especially welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
+guide (setup, the frozen benchmark, security expectations) and
+[SECURITY.md](SECURITY.md) for private vulnerability reports.
 
 ---
 
 ## Screenshots
 
-_Placeholders — add terminal captures here:_
+Captured from the real CLI by `scripts/make_screenshots.py` (isolated sandbox, no
+plugins, no network).
 
-- `docs/screenshot-scan.png` — a `sentinel scan` run
-- `docs/screenshot-explain.png` — a `sentinel explain` breakdown
-- `docs/screenshot-report.png` — the HTML report
+**`sentinel scan examples/auth.log`**
+
+![sentinel scan](docs/screenshots/scan.svg)
+
+**`sentinel explain <id>`**
+
+![sentinel explain](docs/screenshots/explain.svg)
+
+**`sentinel eval --baseline benchmarks/baseline.json`**
+
+![sentinel eval](docs/screenshots/eval.svg)
+
+**`sentinel rules`**
+
+![sentinel rules](docs/screenshots/rules.svg)
+
+**`sentinel respond --pending`** (approval mode, `dry_run` adapter)
+
+![sentinel respond](docs/screenshots/respond.svg)
+
+**`sentinel doctor`**
+
+![sentinel doctor](docs/screenshots/doctor.svg)
+
+To refresh them after command output changes, run
+`python scripts/make_screenshots.py` and commit the SVG files.
+
+---
+
+## Project documents
+
+- [CHANGELOG.md](CHANGELOG.md) — what changed in each version
+- [SECURITY.md](SECURITY.md) — supported versions, private reporting, scope and
+  known limitations
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development setup, rules of the road, the
+  frozen benchmark
+- [docs/PLUGINS.md](docs/PLUGINS.md) — plugin author guide and trust warning
+- [deploy/README.md](deploy/README.md) — systemd install notes
 
 ---
 
