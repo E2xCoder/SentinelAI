@@ -16,6 +16,7 @@ firewall automation through a clean adapter boundary.
 
 ## Table of contents
 
+- [Project status](#project-status)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Installation](#installation)
@@ -40,6 +41,33 @@ firewall automation through a clean adapter boundary.
 - [Screenshots](#screenshots)
 - [Project documents](#project-documents)
 - [License](#license)
+
+---
+
+## Project status
+
+**Beta (0.x).** SentinelAI is not declared stable. Interfaces and rule behaviour
+may still change between minor releases.
+
+What has been checked:
+
+- Unit and integration tests, lint and type checks, and a frozen detection
+  benchmark that gates every change.
+- A validation run on real public logs (Loghub OpenSSH, about 655,000 lines, and
+  Linux syslog). It found and fixed counting and parsing bugs and measured speed
+  (about 20,000 events/s). Details: [docs/REAL_WORLD_VALIDATION.md](docs/REAL_WORLD_VALIDATION.md).
+- Automated response was tested only with the `dry_run` adapter and approval mode.
+
+What has **not** been checked yet:
+
+- Real UFW rule changes, systemd service mode on a live Linux host, and
+  multi-day live monitoring.
+- Web server and Docker logs on real traffic.
+
+Known gaps: slow, low-rate brute force is not detected, rule R007 (off-hours
+login) reads timestamps without a timezone as UTC, and some legacy daemons
+(`ftpd`, `telnetd`) are not parsed. Treat alerts as leads for a human, and keep
+automated blocking in approval mode until you have tested your own firewall.
 
 ---
 
@@ -1247,7 +1275,8 @@ touched. Triage runs without the cache, so every alert is sent to the model.
 `list_blocked`, `is_blocked`) and binds it to *your* Firewall Automation project
 at runtime via one of three adapters:
 
-- **`python`** — import a controller class/factory from your project:
+- **`python`** — import a controller class/factory from your project (a class is
+  instantiated with `init_kwargs`; methods must return `bool`/`list`, not raise):
   ```yaml
   firewall:
     adapter: python
@@ -2008,6 +2037,8 @@ To refresh them after command output changes, run
   frozen benchmark
 - [docs/PLUGINS.md](docs/PLUGINS.md) — plugin author guide and trust warning
 - [deploy/README.md](deploy/README.md) — systemd install notes
+- [docs/REAL_WORLD_VALIDATION.md](docs/REAL_WORLD_VALIDATION.md) — results on real logs,
+  false alarms, speed and open issues
 
 ---
 

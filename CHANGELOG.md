@@ -8,7 +8,18 @@ While the version is 0.x, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Real-world validation fixes: OpenSSH failures logged as several lines are no
+  longer counted two or three times; `service(module)[pid]` headers and
+  `invalid user  X` are parsed; BSD syslog timestamps keep the right year across
+  New Year. Scans commit alerts in batches (about 1.8x faster). Gateway
+  protection logs a warning when it cannot read the route table. The `python`
+  firewall adapter now instantiates a controller class given as `attribute`.
+  See `docs/REAL_WORLD_VALIDATION.md`.
+
 ### Added
+
 
 - Project documents: `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md` and the
   plugin author guide `docs/PLUGINS.md`.
