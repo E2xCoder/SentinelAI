@@ -8,6 +8,10 @@ While the version is 0.x, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-09
+
+First packaged release (Linux, Windows, macOS binaries) plus the real-world validation fixes listed below.
+
 ### Fixed
 
 - Real-world validation fixes: OpenSSH failures logged as several lines are no
