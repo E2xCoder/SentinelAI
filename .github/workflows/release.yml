@@ -41,11 +41,18 @@ jobs:
             scripts/pyinstaller_entry.py
       - name: Smoke test the packaged program
         shell: bash
+        env:
+          # rich treats GitHub Actions as a terminal; on the Windows runner its
+          # legacy Win32 console path then fails with OSError 22. TERM=dumb
+          # makes it write plain text. Output goes to a file because `grep -q`
+          # would close the pipe early and kill the scan (pipefail).
+          TERM: dumb
         run: |
           EXE=dist/sentinel/sentinel
           [ -f "$EXE.exe" ] && EXE="$EXE.exe"
           "$EXE" --version
-          SENTINEL_STATE_DIR="$RUNNER_TEMP/state" "$EXE" scan examples/auth.log --no-ai | grep -q "R00"
+          SENTINEL_STATE_DIR="$RUNNER_TEMP/state" "$EXE" scan examples/auth.log --no-ai > "$RUNNER_TEMP/scan.txt" 2>&1
+          grep -q "R00" "$RUNNER_TEMP/scan.txt"
       - name: Package
         shell: bash
         run: |

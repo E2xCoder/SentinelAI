@@ -3,63 +3,331 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SentinelAI Download</title>
+<title>SentinelAI</title>
+<meta name="description" content="AI-assisted security log analysis, detection and safe automated response for Linux. Free, open source, no Python required.">
 <style>
-  :root { --bg:#0f1419; --fg:#e6edf3; --muted:#9aa7b4; --card:#161d26; --line:#263241; --accent:#3fb950; }
-  @media (prefers-color-scheme: light) {
-    :root { --bg:#f6f8fa; --fg:#1f2328; --muted:#59636e; --card:#fff; --line:#d1d9e0; --accent:#1a7f37; }
+  :root {
+    --bg: #0a0e14;
+    --bg2: #0d1320;
+    --card: #111827;
+    --card2: #0f1726;
+    --line: #1f2b3e;
+    --fg: #e6edf3;
+    --muted: #8b99ab;
+    --dim: #5c6b7f;
+    --accent: #2dd47f;
+    --accent2: #22b86d;
+    --accent-dim: rgba(45, 212, 127, .12);
+    --amber: #e3b341;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
-  main { max-width:760px; margin:0 auto; padding:48px 16px; }
-  h1 { margin:0 0 4px; font-size:2rem; }
-  .tag { display:inline-block; padding:2px 10px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:.85rem; }
-  p.lead { color:var(--muted); }
-  h2 { margin-top:40px; }
-  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  .card.me { border-color:var(--accent); }
-  .card h3 { margin:0 0 4px; }
-  .card small { color:var(--muted); display:block; margin-bottom:12px; }
-  a.btn { display:block; text-align:center; padding:10px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; }
-  .note { color:var(--muted); font-size:.92rem; }
-  code { background:var(--card); border:1px solid var(--line); padding:1px 6px; border-radius:5px; }
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f8fa; --bg2: #eef2f6; --card: #ffffff; --card2: #f8fafc;
+      --line: #d7dee7; --fg: #1f2328; --muted: #57606a; --dim: #8b949e;
+      --accent: #1a7f37; --accent2: #166d2f; --accent-dim: rgba(26, 127, 55, .1);
+      --amber: #9a6700; --red: #cf222e; --blue: #0969da;
+      color-scheme: light;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--accent); }
+
+  /* ── nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 24px; height: 58px; }
+  .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 1.05rem; color: var(--fg); text-decoration: none; }
+  .logo svg { flex: none; }
+  nav .links { margin-left: auto; display: flex; gap: 20px; }
+  nav .links a { color: var(--muted); text-decoration: none; font-size: .92rem; }
+  nav .links a:hover { color: var(--fg); }
+  nav .links a.cta {
+    color: #fff; background: var(--accent2); padding: 6px 14px; border-radius: 7px; font-weight: 600;
+  }
+  @media (max-width: 640px) { nav .links a:not(.cta) { display: none; } }
+
+  /* ── hero ── */
+  header { background: radial-gradient(900px 420px at 50% -80px, var(--accent-dim), transparent), var(--bg); }
+  .hero { padding: 72px 0 56px; text-align: center; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--line); background: var(--card);
+    padding: 5px 14px; border-radius: 99px; font-size: .82rem; color: var(--muted);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--amber); }
+  .hero h1 { font-size: clamp(2.1rem, 5.5vw, 3.3rem); line-height: 1.12; margin: 20px 0 14px; letter-spacing: -.02em; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { max-width: 620px; margin: 0 auto; color: var(--muted); font-size: 1.08rem; }
+  .hero .actions { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 22px; border-radius: 9px; text-decoration: none; font-weight: 600; font-size: .98rem;
+    border: 1px solid transparent; transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--accent2); color: #fff; box-shadow: 0 6px 18px -8px var(--accent2); }
+  .btn.ghost { border-color: var(--line); color: var(--fg); background: var(--card); }
+
+  /* ── terminal ── */
+  .term {
+    max-width: 780px; margin: 48px auto 0; text-align: left;
+    background: #0b0f17; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 24px 60px -30px rgba(0, 0, 0, .7);
+    font: 13.5px/1.75 var(--mono); color: #c9d6e3; overflow: hidden;
+  }
+  .term .bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: #0d1220; }
+  .term .bar i { width: 11px; height: 11px; border-radius: 99px; display: block; }
+  .term .bar i:nth-child(1) { background: #f85149; } .term .bar i:nth-child(2) { background: #e3b341; } .term .bar i:nth-child(3) { background: #2dd47f; }
+  .term .bar span { margin-left: 8px; color: #5c6b7f; font-size: .8rem; }
+  .term pre { padding: 18px 20px; overflow-x: auto; }
+  .t-p { color: #58a6ff; } .t-ok { color: #2dd47f; } .t-crit { color: #f85149; font-weight: 600; }
+  .t-hi { color: #e3b341; } .t-dim { color: #5c6b7f; }
+
+  /* ── stats ── */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; padding: 46px 0 8px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 16px; text-align: center; }
+  .stat b { display: block; font-size: 1.7rem; letter-spacing: -.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: .86rem; }
+  .stats-note { text-align: center; color: var(--dim); font-size: .82rem; padding-bottom: 8px; }
+
+  /* ── sections ── */
+  section { padding: 58px 0; }
+  section h2 { font-size: 1.75rem; letter-spacing: -.01em; margin-bottom: 8px; }
+  .sub { color: var(--muted); max-width: 640px; margin-bottom: 34px; }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+  .card .ic {
+    width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    background: var(--accent-dim); color: var(--accent); margin-bottom: 14px;
+  }
+  .card h3 { font-size: 1.04rem; margin-bottom: 7px; }
+  .card p { color: var(--muted); font-size: .92rem; }
+  .card code { font-family: var(--mono); font-size: .84em; background: var(--card2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+
+  /* ── pipeline ── */
+  .pipe { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+  .pipe .step { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 16px; position: relative; }
+  .pipe .step b { display: flex; align-items: center; gap: 8px; font-size: .95rem; margin-bottom: 5px; }
+  .pipe .step b i { font-style: normal; font-family: var(--mono); font-size: .72rem; color: var(--accent); background: var(--accent-dim); border-radius: 5px; padding: 1px 7px; }
+  .pipe .step p { color: var(--muted); font-size: .84rem; }
+
+  /* ── downloads ── */
+  #download { background: var(--bg2); border-block: 1px solid var(--line); }
+  .dl { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .dl .card { display: flex; flex-direction: column; }
+  .dl .card.me { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .dl .card.me::after { content: "detected"; align-self: flex-start; order: -1; font-size: .72rem; color: var(--accent); background: var(--accent-dim); border-radius: 5px; padding: 2px 8px; margin-bottom: 10px; }
+  .dl h3 { display: flex; align-items: center; gap: 9px; }
+  .dl small { color: var(--muted); display: block; margin: 5px 0 16px; }
+  .dl .btn { margin-top: auto; justify-content: center; background: var(--accent2); color: #fff; }
+  .dl .sums { grid-column: 1 / -1; color: var(--dim); font-size: .86rem; }
+  .notes { margin-top: 26px; display: grid; gap: 10px; }
+  .note { display: flex; gap: 10px; color: var(--muted); font-size: .9rem; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 11px 14px; }
+  .note b { color: var(--fg); font-weight: 600; }
+  .note .i { flex: none; color: var(--amber); }
+
+  /* ── quickstart ── */
+  .qs { background: #0b0f17; border: 1px solid var(--line); border-radius: 11px; padding: 18px 20px; font: 13.5px/1.9 var(--mono); color: #c9d6e3; overflow-x: auto; }
+  .qs .c { color: #5c6b7f; }
+
+  /* ── footer ── */
+  footer { border-top: 1px solid var(--line); padding: 30px 0 36px; }
+  footer .wrap { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
+  footer .left { color: var(--dim); font-size: .88rem; }
+  footer .left a { color: var(--muted); text-decoration: none; }
+  footer .left a:hover { color: var(--fg); }
+  .signature { margin-left: auto; text-align: right; }
+  .signature small { display: block; color: var(--dim); font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; }
+  .signature b {
+    font-family: "Segoe Script", "Brush Script MT", cursive;
+    font-size: 1.9rem; font-weight: 400; color: var(--accent);
+    text-shadow: 0 0 22px var(--accent-dim);
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>SentinelAI</h1>
-  <span class="tag">Beta</span>
-  <p class="lead">AI-assisted security log analysis and detection. No Python needed.</p>
 
-  <h2>Download</h2>
-  <div class="grid">
-    <div class="card" id="linux">
-      <h3>Linux</h3><small>x64, .tar.gz &middot; full features</small>
-      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-linux-x64.tar.gz">Download for Linux</a>
-    </div>
-    <div class="card" id="windows">
-      <h3>Windows</h3><small>x64, .zip &middot; log analysis</small>
-      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-windows-x64.zip">Download for Windows</a>
-    </div>
-    <div class="card" id="mac">
-      <h3>macOS</h3><small>Apple Silicon, .zip &middot; log analysis</small>
-      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-macos-arm64.zip">Download for macOS</a>
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/><path d="M8.5 12l2.3 2.3L15.5 9.5"/>
+      </svg>
+      SentinelAI
+    </a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#speed">Performance</a>
+      <a href="https://github.com/E2xCoder/SentinelAI">GitHub</a>
+      <a class="cta" href="#download">Download</a>
     </div>
   </div>
-  <p class="note">Checksums: <a href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a></p>
+</nav>
 
-  <h2>Before you run it</h2>
-  <ul class="note">
-    <li>Beta software. Treat alerts as leads for a human to check.</li>
-    <li>Unzip, open a terminal in the folder, run <code>sentinel scan your.log</code>.</li>
-    <li>Windows and macOS builds are not code-signed, so the system may warn you the first time.</li>
-    <li>Automatic firewall blocking works on Linux only, and is off by default.</li>
-  </ul>
-</main>
+<header>
+  <div class="wrap hero">
+    <span class="badge"><span class="dot"></span> Beta &middot; open source &middot; MIT</span>
+    <h1>Your logs already know<br>about the <em>attack</em>.</h1>
+    <p>SentinelAI reads Linux logs, detects brute force, privilege escalation and port scans with explained risk scores, and can drive your firewall — safely, with a human in the loop.</p>
+    <div class="actions">
+      <a class="btn primary" href="#download">Download free</a>
+      <a class="btn ghost" href="https://github.com/E2xCoder/SentinelAI">View source</a>
+    </div>
+
+    <div class="term" role="img" aria-label="Terminal showing sentinel scan output">
+      <div class="bar"><i></i><i></i><i></i><span>sentinel — scan</span></div>
+      <pre><span class="t-p">$</span> sentinel scan /var/log/auth.log
+<span class="t-dim">Parsed 655,147 events · syslog (auth) · 47s</span>
+<span class="t-crit">CRITICAL</span>  R002  Distributed brute force — 187 sources, user <span class="t-hi">root</span>
+<span class="t-crit">CRITICAL</span>  R004  Successful login after 312 failures — <span class="t-hi">203.0.113.55</span>
+<span class="t-hi">HIGH</span>      R001  Brute force from 183.62.140.10 — 569 attempts
+<span class="t-hi">HIGH</span>      R012  Port scan — 24 ports in 9s from 198.51.100.7
+<span class="t-ok">✓</span> Attack pattern: <span class="t-crit">intrusion after brute force</span> (confidence 90%)
+<span class="t-ok">✓</span> Incident #3 — kill chain: recon → brute force → initial access
+<span class="t-dim">Wrote reports/sentinelai-report.html</span></pre>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats" id="speed">
+    <div class="stat"><b>20,600</b><span>events / second</span></div>
+    <div class="stat"><b>1.3M</b><span>log lines in 47 s</span></div>
+    <div class="stat"><b>6,678</b><span>automated tests</span></div>
+    <div class="stat"><b>57</b><span>benchmark scenarios</span></div>
+    <div class="stat"><b>~320 MB</b><span>peak memory</span></div>
+  </div>
+  <p class="stats-note">Measured on real public logs (Loghub OpenSSH, 655k lines) — full method and false-alarm numbers in <a href="https://github.com/E2xCoder/SentinelAI/blob/main/docs/REAL_WORLD_VALIDATION.md">REAL_WORLD_VALIDATION.md</a>.</p>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="sub">A complete blue-team pipeline in one binary: parse, detect, correlate, score, explain — and only then, optionally, block.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+        <h3>Reads your real logs</h3>
+        <p>Streaming parsers for auth.log / syslog, UFW, nginx &amp; Apache, Docker and journald — including messy legacy formats like <code>sshd(pam_unix)</code>. Malformed lines never crash a scan.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <h3>20 detection rules + Sigma</h3>
+        <p>Brute force, password spraying, root logins, sudo abuse, port scans, service tampering and more — plus an importer that runs community <a href="https://github.com/SigmaHQ/sigma">Sigma</a> rules with ReDoS-safe matching.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <h3>Incidents, not noise</h3>
+        <p>Related alerts are correlated into incidents with a kill-chain timeline, so 300 failed logins and the one success that followed read as a single story.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.2-2.6 5.6-.9 1-1.4 1.8-1.4 3.4h-6c0-1.6-.5-2.4-1.4-3.4C6.3 13.2 5 11.5 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg></div>
+        <h3>Explained risk scores</h3>
+        <p>Every alert carries a 0–100 score with the exact factors that produced it. ML anomaly detection and optional local-LLM triage are assistants — never silent judges.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/></svg></div>
+        <h3>Response with guardrails</h3>
+        <p>Firewall blocking is off by default and Linux-only: allowlists, cooldowns, block budgets, TTL auto-expiry, approval mode, a full audit log and one-command rollback. It refuses to lock out your own gateway.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></svg></div>
+        <h3>Reports &amp; daily digest</h3>
+        <p>HTML, JSON, CSV and Markdown reports from every scan, plus a plain-language daily digest. <code>sentinel replay</code> re-runs any historical log as if it were live.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">One streaming pass, five stages. Arbitrarily large logs run in bounded memory.</p>
+    <div class="pipe">
+      <div class="step"><b><i>1</i> Parse</b><p>Raw lines become structured events: time, IP, user, service.</p></div>
+      <div class="step"><b><i>2</i> Detect</b><p>Sliding-window rules + Sigma pack + ML anomaly pass.</p></div>
+      <div class="step"><b><i>3</i> Correlate</b><p>Alerts group into incidents along the kill chain.</p></div>
+      <div class="step"><b><i>4</i> Score</b><p>Explained 0–100 risk with threat-intel enrichment.</p></div>
+      <div class="step"><b><i>5</i> Respond</b><p>Report always; block only with rails, or on your approval.</p></div>
+    </div>
+
+    <h2 style="margin-top:48px">60-second start</h2>
+    <div class="qs" style="margin-top:18px">
+      <span class="c"># unzip, then from the folder:</span><br>
+      ./sentinel scan /var/log/auth.log &nbsp;&nbsp;<span class="c"># find threats in a log</span><br>
+      ./sentinel live &nbsp;&nbsp;<span class="c"># watch logs in real time (Linux)</span><br>
+      ./sentinel respond list &nbsp;&nbsp;<span class="c"># review &amp; approve any blocks yourself</span>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="sub">Self-contained build — no Python, no dependencies. Unzip and run. Also installable with <code style="font-family:var(--mono)">pip install</code> from source.</p>
+    <div class="dl">
+      <div class="card" id="dl-linux">
+        <h3>&#128039; Linux</h3>
+        <small>x64 · .tar.gz · full features, incl. live mode &amp; UFW response</small>
+        <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-linux-x64.tar.gz">Download for Linux</a>
+      </div>
+      <div class="card" id="dl-windows">
+        <h3>&#129762; Windows</h3>
+        <small>x64 · .zip · log analysis, reports &amp; triage</small>
+        <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-windows-x64.zip">Download for Windows</a>
+      </div>
+      <div class="card" id="dl-mac">
+        <h3>&#63743; macOS</h3>
+        <small>Apple Silicon · .zip · log analysis, reports &amp; triage</small>
+        <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-macos-arm64.zip">Download for macOS</a>
+      </div>
+      <p class="sums">Verify your download: <a href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> · all versions on the <a href="https://github.com/E2xCoder/SentinelAI/releases">releases page</a>.</p>
+    </div>
+    <div class="notes">
+      <div class="note"><span class="i">&#9888;&#65039;</span><p><b>Beta.</b> Detection is validated on real logs, but treat alerts as leads for a human — not verdicts. Slow, low-rate brute force is a known gap.</p></div>
+      <div class="note"><span class="i">&#9888;&#65039;</span><p><b>Unsigned builds.</b> Windows SmartScreen / macOS Gatekeeper may warn on first run (“More info → Run anyway”). Verify the SHA-256 checksum if in doubt.</p></div>
+      <div class="note"><span class="i">&#9888;&#65039;</span><p><b>Blocking is Linux-only and off by default.</b> Windows/macOS builds analyse logs and write reports; they never touch a firewall.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="left">
+      SentinelAI · MIT license ·
+      <a href="https://github.com/E2xCoder/SentinelAI">Source</a> ·
+      <a href="https://github.com/E2xCoder/SentinelAI/blob/main/SECURITY.md">Security policy</a> ·
+      <a href="https://github.com/E2xCoder/SentinelAI/blob/main/docs/REAL_WORLD_VALIDATION.md">Validation report</a>
+    </div>
+    <div class="signature">
+      <small>crafted by</small>
+      <b>E2xCoder</b>
+    </div>
+  </div>
+</footer>
+
 <script>
-  var ua = navigator.userAgent, id = /Windows/.test(ua) ? "windows" : /Mac/.test(ua) ? "mac" : /Linux/.test(ua) ? "linux" : "";
-  var el = id && document.getElementById(id); if (el) el.className += " me";
+  var ua = navigator.userAgent;
+  var id = /Windows/.test(ua) ? "dl-windows" : /Mac/.test(ua) ? "dl-mac" : /Linux|X11/.test(ua) ? "dl-linux" : "";
+  var el = id && document.getElementById(id);
+  if (el) el.classList.add("me");
 </script>
 </body>
 </html>
