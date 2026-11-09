@@ -85,7 +85,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha256sum assets/* > assets/SHA256SUMS.txt
+          (cd assets && sha256sum * > SHA256SUMS.txt)
           gh release create "${{ github.ref_name }}" assets/* \
             --repo "${{ github.repository }}" \
             --title "SentinelAI ${{ github.ref_name }} (Beta)" \
