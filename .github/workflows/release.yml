@@ -1,0 +1,85 @@
+name: Release binaries
+
+# Runs only when a version tag such as v0.1.0 is pushed (or by hand, which
+# builds and tests the packages but publishes nothing).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: sentinelai-linux-x64.tar.gz
+          - os: windows-latest
+            asset: sentinelai-windows-x64.zip
+          - os: macos-latest
+            asset: sentinelai-macos-arm64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller .
+      - name: Build
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --onedir --name sentinel \
+            --collect-all sentinelai --copy-metadata sentinelai \
+            scripts/pyinstaller_entry.py
+      - name: Smoke test the packaged program
+        shell: bash
+        run: |
+          EXE=dist/sentinel/sentinel
+          [ -f "$EXE.exe" ] && EXE="$EXE.exe"
+          "$EXE" --version
+          SENTINEL_STATE_DIR="$RUNNER_TEMP/state" "$EXE" scan examples/auth.log --no-ai | grep -q "R00"
+      - name: Package
+        shell: bash
+        run: |
+          cp LICENSE README.md dist/sentinel/
+          cd dist
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            tar -czf "../${{ matrix.asset }}" sentinel
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a -tzip "../${{ matrix.asset }}" sentinel
+          else
+            zip -qr "../${{ matrix.asset }}" sentinel
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum assets/* > assets/SHA256SUMS.txt
+          gh release create "${{ github.ref_name }}" assets/* \
+            --repo "${{ github.repository }}" \
+            --title "SentinelAI ${{ github.ref_name }} (Beta)" \
+            --notes "Beta release. Windows and macOS builds are unsigned and analyse log files; automated blocking is Linux-only. Check the SHA256SUMS.txt file after downloading."

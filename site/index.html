@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelAI Download</title>
+<style>
+  :root { --bg:#0f1419; --fg:#e6edf3; --muted:#9aa7b4; --card:#161d26; --line:#263241; --accent:#3fb950; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f8fa; --fg:#1f2328; --muted:#59636e; --card:#fff; --line:#d1d9e0; --accent:#1a7f37; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:48px 16px; }
+  h1 { margin:0 0 4px; font-size:2rem; }
+  .tag { display:inline-block; padding:2px 10px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:.85rem; }
+  p.lead { color:var(--muted); }
+  h2 { margin-top:40px; }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card.me { border-color:var(--accent); }
+  .card h3 { margin:0 0 4px; }
+  .card small { color:var(--muted); display:block; margin-bottom:12px; }
+  a.btn { display:block; text-align:center; padding:10px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; }
+  .note { color:var(--muted); font-size:.92rem; }
+  code { background:var(--card); border:1px solid var(--line); padding:1px 6px; border-radius:5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SentinelAI</h1>
+  <span class="tag">Beta</span>
+  <p class="lead">AI-assisted security log analysis and detection. No Python needed.</p>
+
+  <h2>Download</h2>
+  <div class="grid">
+    <div class="card" id="linux">
+      <h3>Linux</h3><small>x64, .tar.gz &middot; full features</small>
+      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-linux-x64.tar.gz">Download for Linux</a>
+    </div>
+    <div class="card" id="windows">
+      <h3>Windows</h3><small>x64, .zip &middot; log analysis</small>
+      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-windows-x64.zip">Download for Windows</a>
+    </div>
+    <div class="card" id="mac">
+      <h3>macOS</h3><small>Apple Silicon, .zip &middot; log analysis</small>
+      <a class="btn" href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/sentinelai-macos-arm64.zip">Download for macOS</a>
+    </div>
+  </div>
+  <p class="note">Checksums: <a href="https://github.com/E2xCoder/SentinelAI/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a></p>
+
+  <h2>Before you run it</h2>
+  <ul class="note">
+    <li>Beta software. Treat alerts as leads for a human to check.</li>
+    <li>Unzip, open a terminal in the folder, run <code>sentinel scan your.log</code>.</li>
+    <li>Windows and macOS builds are not code-signed, so the system may warn you the first time.</li>
+    <li>Automatic firewall blocking works on Linux only, and is off by default.</li>
+  </ul>
+</main>
+<script>
+  var ua = navigator.userAgent, id = /Windows/.test(ua) ? "windows" : /Mac/.test(ua) ? "mac" : /Linux/.test(ua) ? "linux" : "";
+  var el = id && document.getElementById(id); if (el) el.className += " me";
+</script>
+</body>
+</html>
