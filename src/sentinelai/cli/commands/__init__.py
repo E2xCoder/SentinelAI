@@ -14,6 +14,7 @@ the root group, so adding a command is a local change here.
 from sentinelai.cli.commands.analysis import analyze, live, replay, scan
 from sentinelai.cli.commands.digest import digest_cmd
 from sentinelai.cli.commands.evaluation import eval_cmd
+from sentinelai.cli.commands.gui import gui_cmd
 from sentinelai.cli.commands.incidents import incident_cmd, incidents_cmd
 from sentinelai.cli.commands.inspection import (
     config_cmd,
@@ -49,6 +50,7 @@ ALL_COMMANDS = [
     init_cmd,
     doctor_cmd,
     digest_cmd,
+    gui_cmd,
 ]
 
 __all__ = ["ALL_COMMANDS"]

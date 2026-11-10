@@ -18,6 +18,7 @@ firewall automation through a clean adapter boundary.
 
 - [Project status](#project-status)
 - [Features](#features)
+- [Desktop app](#desktop-app)
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Quick start](#quick-start)
@@ -107,6 +108,24 @@ automated blocking in approval mode until you have tested your own firewall.
   rules, models or report formats with zero core changes (see
   [docs/PLUGINS.md](docs/PLUGINS.md); plugins run unsandboxed with your
   privileges).
+
+---
+
+## Desktop app
+
+`sentinel gui` (or the `SentinelAI` program in the packaged downloads) opens a
+desktop window: drop a log file in, and browse the verdict, attack patterns,
+incidents and every alert with its full risk explanation. It also shows stored
+history and the rule list, and exports the HTML report.
+
+- The window is a chromeless Edge/Chrome window when one is installed, otherwise
+  a tab in your default browser. No extra runtime is bundled.
+- It talks only to a local service on `127.0.0.1`, guarded by a random per-run
+  token and a `Host` header check. Log content is rendered as text, never HTML.
+- It is **read-only**: scans started from the window always run with response
+  disabled and the `dry_run` firewall adapter, whatever the config says.
+- Not included in the window yet: live monitoring, response approvals, tuning
+  and Sigma import. Use the CLI for those.
 
 ---
 

@@ -35,11 +35,8 @@ jobs:
           python -m pip install pyinstaller .
       - name: Build
         shell: bash
-        run: |
-          python -m PyInstaller --noconfirm --onedir --name sentinel \
-            --collect-all sentinelai --copy-metadata sentinelai \
-            scripts/pyinstaller_entry.py
-      - name: Smoke test the packaged program
+        run: python -m PyInstaller --noconfirm packaging/sentinelai.spec
+      - name: Smoke test the packaged programs
         shell: bash
         env:
           # rich treats GitHub Actions as a terminal; on the Windows runner its
@@ -47,23 +44,31 @@ jobs:
           # makes it write plain text. Output goes to a file because `grep -q`
           # would close the pipe early and kill the scan (pipefail).
           TERM: dumb
+          SENTINELAI_STATE_DIR: ${{ runner.temp }}/state
         run: |
-          EXE=dist/sentinel/sentinel
-          [ -f "$EXE.exe" ] && EXE="$EXE.exe"
-          "$EXE" --version
-          SENTINEL_STATE_DIR="$RUNNER_TEMP/state" "$EXE" scan examples/auth.log --no-ai > "$RUNNER_TEMP/scan.txt" 2>&1
+          BIN=dist/SentinelAI
+          [ -d dist/SentinelAI.app ] && BIN=dist/SentinelAI.app/Contents/MacOS
+          EXT=""
+          [ -f "$BIN/sentinel.exe" ] && EXT=".exe"
+          "$BIN/sentinel$EXT" --version
+          "$BIN/sentinel$EXT" scan examples/auth.log --no-ai > "$RUNNER_TEMP/scan.txt" 2>&1
           grep -q "R00" "$RUNNER_TEMP/scan.txt"
+          # The windowed program: serve the interface and scan the sample, no window.
+          "$BIN/SentinelAI$EXT" --selftest "$RUNNER_TEMP/selftest.txt" || true
+          cat "$RUNNER_TEMP/selftest.txt"
+          grep -q "SELFTEST OK" "$RUNNER_TEMP/selftest.txt"
       - name: Package
         shell: bash
         run: |
-          cp LICENSE README.md dist/sentinel/
           cd dist
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            tar -czf "../${{ matrix.asset }}" sentinel
+            cp ../LICENSE ../README.md SentinelAI/
+            tar -czf "../${{ matrix.asset }}" SentinelAI
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a -tzip "../${{ matrix.asset }}" sentinel
+            cp ../LICENSE ../README.md SentinelAI/
+            7z a -tzip "../${{ matrix.asset }}" SentinelAI
           else
-            zip -qr "../${{ matrix.asset }}" sentinel
+            ditto -c -k --keepParent SentinelAI.app "../${{ matrix.asset }}"
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -89,4 +94,4 @@ jobs:
           gh release create "${{ github.ref_name }}" assets/* \
             --repo "${{ github.repository }}" \
             --title "SentinelAI ${{ github.ref_name }} (Beta)" \
-            --notes "Beta release. Windows and macOS builds are unsigned and analyse log files; automated blocking is Linux-only. Check the SHA256SUMS.txt file after downloading."
+            --notes "Beta release. Unzip and open SentinelAI (desktop app); the sentinel command-line tool is in the same folder. Builds are unsigned. The app is read-only; automated blocking is a Linux-only CLI feature. Check SHA256SUMS.txt after downloading."

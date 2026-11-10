@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sentinelai"
-version = "0.1.1"
+version = "0.2.0"
 description = "AI-assisted security log analysis, detection and automated response platform for Linux systems."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -52,6 +52,9 @@ dev = [
 [project.scripts]
 sentinel = "sentinelai.cli.app:main"
 
+[project.gui-scripts]
+sentinelai-gui = "sentinelai.gui.app:main"
+
 [project.urls]
 Homepage = "https://github.com/E2xCoder/SentinelAI"
 Documentation = "https://github.com/E2xCoder/SentinelAI#readme"
@@ -60,7 +63,7 @@ Documentation = "https://github.com/E2xCoder/SentinelAI#readme"
 where = ["src"]
 
 [tool.setuptools.package-data]
-sentinelai = ["py.typed"]
+sentinelai = ["py.typed", "gui/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

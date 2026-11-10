@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelAI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230d1320'/%3E%3Cpath d='M12 3.5l6.5 2.8v4.3c0 4-2.8 7.8-6.5 9.2-3.700-1.400-6.500-5.200-6.500-9.200V6.300L12 3.500z' fill='none' stroke='%232dd47f' stroke-width='1.800' stroke-linejoin='round'/%3E%3Cpath d='M9.200 12l2 2 3.700-3.800' fill='none' stroke='%232dd47f' stroke-width='1.800' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0a0e14; --side: #0c111b; --card: #111827; --card2: #0e1524; --line: #1f2b3e;
+    --fg: #e6edf3; --muted: #8b99ab; --dim: #5c6b7f;
+    --accent: #2dd47f; --accent2: #22b86d; --accent-dim: rgba(45, 212, 127, .12);
+    --critical: #f85149; --high: #f0883e; --medium: #e3b341; --low: #58a6ff; --informational: #8b99ab;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6f9; --side: #ffffff; --card: #ffffff; --card2: #f6f8fb; --line: #d7dee7;
+      --fg: #1f2328; --muted: #57606a; --dim: #8b949e;
+      --accent: #1a7f37; --accent2: #1a7f37; --accent-dim: rgba(26, 127, 55, .1);
+      --critical: #cf222e; --high: #bc4c00; --medium: #9a6700; --low: #0969da; --informational: #6e7781;
+      color-scheme: light;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font: 14.5px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+  .app { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
+
+  /* sidebar */
+  aside { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 12px 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.08rem; padding: 2px 8px 18px; }
+  .brand small { font-weight: 500; font-size: .68rem; color: var(--medium); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; }
+  .nav { display: flex; flex-direction: column; gap: 3px; }
+  .nav button { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 10px; color: var(--muted); }
+  .nav button:hover { background: var(--card2); color: var(--fg); }
+  .nav button.on { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+  .nav button .count { margin-left: auto; font-size: .74rem; background: var(--card2); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; color: var(--muted); }
+  aside .foot { margin-top: auto; color: var(--dim); font-size: .76rem; padding: 0 8px; line-height: 1.5; }
+  aside .safe { display: flex; gap: 8px; align-items: flex-start; background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; margin-bottom: 12px; color: var(--muted); }
+  aside .safe svg { flex: none; color: var(--accent); margin-top: 2px; }
+
+  /* main */
+  main { overflow-y: auto; padding: 26px 32px 80px; }
+  .view { display: none; max-width: 1180px; margin: 0 auto; }
+  .view.on { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  h1 { font-size: 1.5rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.02rem; margin: 26px 0 12px; display: flex; align-items: center; gap: 8px; }
+  h2 .n { color: var(--muted); font-weight: 500; font-size: .86rem; }
+  .lead { color: var(--muted); margin-top: 3px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 8px 15px; font-weight: 600; }
+  .btn:hover { border-color: var(--dim); }
+  .btn.primary { background: var(--accent2); border-color: transparent; color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* scan view */
+  .drop { margin-top: 22px; border: 2px dashed var(--line); border-radius: 16px; background: var(--card); padding: 46px 20px; text-align: center; transition: border-color .15s, background .15s; cursor: pointer; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-dim); }
+  .drop .ic { width: 58px; height: 58px; border-radius: 15px; background: var(--accent-dim); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .drop b { font-size: 1.12rem; display: block; }
+  .drop span { color: var(--muted); }
+  .row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  .row input[type=text] { flex: 1 1 320px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-family: var(--mono); font-size: .86rem; outline: none; }
+  .row input[type=text]:focus { border-color: var(--accent); }
+  .toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .88rem; user-select: none; }
+  .hints { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 26px; }
+  .hints .card b { display: block; margin-bottom: 3px; }
+  .hints .card span { color: var(--muted); font-size: .88rem; }
+
+  /* progress */
+  .progress { margin-top: 22px; display: none; }
+  .progress.on { display: block; }
+  .bar { height: 6px; border-radius: 99px; background: var(--card2); overflow: hidden; margin: 14px 0 16px; }
+  .bar i { display: block; height: 100%; width: 35%; border-radius: 99px; background: var(--accent); animation: slide 1.15s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(310%); } }
+  .live { display: flex; gap: 34px; flex-wrap: wrap; }
+  .live div b { display: block; font-size: 1.55rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .live div span { color: var(--muted); font-size: .82rem; }
+  .err { margin-top: 16px; border: 1px solid var(--critical); color: var(--critical); background: color-mix(in srgb, var(--critical) 9%, transparent); border-radius: 10px; padding: 11px 14px; display: none; }
+  .err.on { display: block; }
+
+  /* results */
+  .head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .head .grow { flex: 1 1 300px; min-width: 0; }
+  .head .src { color: var(--muted); font-family: var(--mono); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 12px; margin-top: 20px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 1.6rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: .8rem; }
+  .verdict { margin-top: 18px; border-radius: 12px; padding: 14px 18px; display: flex; gap: 13px; align-items: center; border: 1px solid var(--line); background: var(--card); }
+  .verdict .dot { width: 12px; height: 12px; border-radius: 99px; flex: none; }
+  .verdict b { display: block; }
+  .verdict span { color: var(--muted); font-size: .9rem; }
+  .dist { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--card2); margin-top: 14px; }
+  .dist i { display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 9px; color: var(--muted); font-size: .82rem; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; }
+  .pattern { border-left: 3px solid var(--critical); padding: 3px 0 3px 13px; margin-bottom: 13px; }
+  .pattern:last-child { margin-bottom: 0; }
+  .pattern b { display: block; }
+  .pattern span { color: var(--muted); font-size: .9rem; }
+  .pattern em { font-style: normal; color: var(--dim); font-size: .8rem; margin-left: 6px; }
+  .rank { display: grid; grid-template-columns: minmax(0, 150px) 1fr 38px; gap: 10px; align-items: center; margin-bottom: 8px; font-size: .86rem; }
+  .rank code { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank .t { height: 7px; border-radius: 99px; background: var(--card2); overflow: hidden; }
+  .rank .t i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .rank .v { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  ul.recs { padding-left: 18px; color: var(--muted); }
+  ul.recs li { margin-bottom: 6px; }
+  .incident { margin-bottom: 12px; }
+  .incident .top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .incident .top b { flex: 1 1 240px; }
+  .chain { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+  .chain span { background: var(--card2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 9px; font-size: .78rem; }
+  .chain i { color: var(--dim); font-style: normal; }
+  .incident p { color: var(--muted); font-size: .9rem; margin-top: 8px; }
+
+  /* table */
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 99px; padding: 4px 12px; font-size: .82rem; color: var(--muted); }
+  .chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .tools input { margin-left: auto; flex: 0 1 260px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; outline: none; }
+  .tools input:focus { border-color: var(--accent); }
+  .tablewrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--card2); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  tbody tr.click { cursor: pointer; }
+  tbody tr.click:hover { background: var(--card2); }
+  td.mono, .mono { font-family: var(--mono); font-size: .83rem; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .lvl { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+  .lvl::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
+  .lvl.critical { color: var(--critical); background: color-mix(in srgb, var(--critical) 13%, transparent); }
+  .lvl.high { color: var(--high); background: color-mix(in srgb, var(--high) 13%, transparent); }
+  .lvl.medium { color: var(--medium); background: color-mix(in srgb, var(--medium) 13%, transparent); }
+  .lvl.low { color: var(--low); background: color-mix(in srgb, var(--low) 13%, transparent); }
+  .lvl.informational { color: var(--informational); background: color-mix(in srgb, var(--informational) 13%, transparent); }
+  .score { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .more { text-align: center; padding: 12px; }
+  .empty { text-align: center; color: var(--muted); padding: 44px 20px; }
+  .empty b { display: block; color: var(--fg); font-size: 1.05rem; margin-bottom: 4px; }
+
+  /* drawer */
+  .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 20; }
+  .shade.on { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 94vw); background: var(--side); border-left: 1px solid var(--line); transform: translateX(102%); transition: transform .2s ease; z-index: 21; display: flex; flex-direction: column; }
+  .drawer.on { transform: none; }
+  .drawer header { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .drawer header div { flex: 1; min-width: 0; }
+  .drawer header h3 { font-size: 1.05rem; margin-top: 7px; overflow-wrap: anywhere; }
+  .drawer .x { background: none; border: 0; color: var(--muted); font-size: 1.4rem; line-height: 1; padding: 2px 6px; }
+  .drawer .body { overflow-y: auto; padding: 18px 22px 30px; }
+  .drawer h4 { font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 0 8px; }
+  .drawer .body > h4:first-child { margin-top: 0; }
+  .drawer p { overflow-wrap: anywhere; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 5px 12px; font-size: .88rem; }
+  .kv span { color: var(--muted); }
+  .kv b { font-weight: 500; overflow-wrap: anywhere; }
+  .factor { display: grid; grid-template-columns: 46px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: .88rem; }
+  .factor:last-child { border-bottom: 0; }
+  .factor .p { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--high); text-align: right; }
+  .factor .p.neg { color: var(--accent); }
+  .factor span { color: var(--muted); display: block; overflow-wrap: anywhere; }
+  .gauge { height: 8px; border-radius: 99px; background: var(--card2); overflow: hidden; margin: 6px 0 4px; }
+  .gauge i { display: block; height: 100%; border-radius: 99px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tags span { background: var(--card2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; font-size: .78rem; font-family: var(--mono); }
+  pre.ev { background: #0b0f17; color: #c9d6e3; border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow-y: auto; }
+  .rec { background: var(--accent-dim); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 9px; padding: 10px 13px; }
+
+  .signature { position: fixed; right: 20px; bottom: 12px; text-align: right; pointer-events: none; z-index: 5; }
+  .signature small { display: block; color: var(--dim); font-size: .62rem; letter-spacing: .16em; text-transform: uppercase; }
+  .signature b { font-family: "Segoe Script", "Brush Script MT", "Snell Roundhand", cursive; font-size: 1.35rem; font-weight: 400; color: var(--accent); opacity: .9; }
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px; opacity: 0; transition: .2s; z-index: 30; pointer-events: none; box-shadow: 0 12px 30px -12px rgba(0, 0, 0, .6); }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } aside { display: none; } main { padding: 18px 16px 80px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 3.500v5.200c0 5-3.400 9.600-8 11.300-4.600-1.700-8-6.300-8-11.300V5.500L12 2z"/><path d="M8.500 12l2.300 2.300L15.500 9.500"/></svg>
+      SentinelAI <small>beta</small>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="scan" class="on"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.300-4.300"/></svg>Scan a log</button>
+      <button data-view="results"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Results<span class="count" id="nav-results" hidden></span></button>
+      <button data-view="history"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>History</button>
+      <button data-view="rules"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Detection rules</button>
+      <button data-view="about"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.500"/></svg>About</button>
+    </nav>
+    <div class="foot">
+      <div class="safe">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3.500v5.200c0 5-3.400 9.600-8 11.300-4.600-1.700-8-6.300-8-11.300V5.500L12 2z"/></svg>
+        <span>Read-only. This window never changes your firewall.</span>
+      </div>
+      <span id="ver">SentinelAI</span>
+    </div>
+  </aside>
+
+  <main>
+    <!-- scan -->
+    <section class="view on" id="view-scan">
+      <h1>Scan a log</h1>
+      <p class="lead">Find brute force, privilege escalation and other attacks in a Linux log file. Everything stays on this computer.</p>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a log file">
+        <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+        <b>Drop a log file here</b>
+        <span>or click to choose one &middot; auth.log, syslog, ufw.log, nginx / Apache access logs, .gz</span>
+        <input type="file" id="file" hidden>
+      </div>
+      <div class="row">
+        <input type="text" id="path" placeholder="…or paste a full path, e.g. /var/log/auth.log" spellcheck="false" autocomplete="off">
+        <button class="btn primary" id="scan-path">Scan</button>
+        <button class="btn" id="scan-sample">Try the sample log</button>
+      </div>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="use-ai"> <span id="ai-label">ML anomaly detection</span></label>
+      </div>
+      <div class="err" id="scan-err"></div>
+      <div class="card progress" id="progress">
+        <b id="p-title">Analyzing…</b>
+        <div class="bar"><i></i></div>
+        <div class="live">
+          <div><b id="p-events">0</b><span>events parsed</span></div>
+          <div><b id="p-rate">0</b><span>events / second</span></div>
+          <div><b id="p-time">0.0 s</b><span>elapsed</span></div>
+        </div>
+      </div>
+      <div class="hints">
+        <div class="card"><b>20 built-in rules</b><span>Brute force, password spraying, root logins, sudo abuse, port scans and more.</span></div>
+        <div class="card"><b>Explained scores</b><span>Every alert shows exactly which factors produced its 0–100 risk score.</span></div>
+        <div class="card"><b>Incidents</b><span>Related alerts are joined into one attack story along the kill chain.</span></div>
+      </div>
+    </section>
+
+    <!-- results -->
+    <section class="view" id="view-results">
+      <div class="empty" id="results-empty"><b>No scan yet</b>Scan a log file to see results here.</div>
+      <div id="results-body" hidden></div>
+    </section>
+
+    <!-- history -->
+    <section class="view" id="view-history">
+      <div class="head">
+        <div class="grow"><h1>History</h1><p class="lead">Alerts and incidents stored on this computer by earlier scans.</p></div>
+        <button class="btn" id="history-refresh">Refresh</button>
+      </div>
+      <div id="history-body"></div>
+    </section>
+
+    <!-- rules -->
+    <section class="view" id="view-rules">
+      <h1>Detection rules</h1>
+      <p class="lead">Built-in rules that run on every scan. Community Sigma rules can be added from the command line.</p>
+      <div id="rules-body" style="margin-top:20px"></div>
+    </section>
+
+    <!-- about -->
+    <section class="view" id="view-about">
+      <h1>About SentinelAI</h1>
+      <p class="lead">AI-assisted security log analysis and detection.</p>
+      <div class="card" style="margin-top:20px"><div class="kv" id="about-kv"></div></div>
+      <h2>Good to know</h2>
+      <div class="card">
+        <ul class="recs">
+          <li><b style="color:var(--fg)">Beta.</b> Treat alerts as leads for a person to check, not as verdicts. Slow, low-rate brute force is a known gap.</li>
+          <li><b style="color:var(--fg)">Private.</b> Logs are analysed on this computer. This window talks only to a local service on 127.0.0.1.</li>
+          <li><b style="color:var(--fg)">Read-only.</b> Scans started here never block anything. Automated firewall response is a separate, Linux-only command-line feature that is off by default.</li>
+          <li><b style="color:var(--fg)">More power.</b> The <span class="mono">sentinel</span> command next to this program adds live monitoring, Sigma rules, tuning and reports.</li>
+        </ul>
+      </div>
+      <div class="row"><button class="btn" id="quit">Quit SentinelAI</button></div>
+    </section>
+  </main>
+</div>
+
+<div class="shade" id="shade"></div>
+<div class="drawer" id="drawer" aria-hidden="true">
+  <header><div id="drawer-head"></div><button class="x" id="drawer-x" aria-label="Close">&times;</button></header>
+  <div class="body" id="drawer-body"></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="signature"><small>crafted by</small><b>E2xCoder</b></div>
+
+<script>
+"use strict";
+// All text that comes from logs is inserted with textContent, never as HTML.
+const LEVELS = ["critical", "high", "medium", "low", "informational"];
+const $ = (id) => document.getElementById(id);
+
+function el(tag, attrs, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else if (k === "style") node.style.cssText = v;
+    else node.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    node.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return node;
+}
+const put = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
+const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+const when = (iso) => { if (!iso) return "–"; const d = new Date(iso); return isNaN(d) ? String(iso) : d.toISOString().replace("T", " ").slice(0, 19) + " UTC"; };
+const lvl = (name) => el("span", { class: "lvl " + (LEVELS.includes(name) ? name : "informational"), text: name || "info" });
+const color = (name) => `var(--${LEVELS.includes(name) ? name : "informational"})`;
+
+// ── token and API ──
+let token = "";
+(() => {
+  const m = /[#&]t=([^&]+)/.exec(location.hash);
+  if (m) { token = decodeURIComponent(m[1]); try { sessionStorage.setItem("t", token); } catch (e) {} history.replaceState(null, "", location.pathname); }
+  else { try { token = sessionStorage.getItem("t") || ""; } catch (e) {} }
+})();
+async function api(path, opts) {
+  const o = opts || {};
+  const res = await fetch(path, { method: o.method || "GET", body: o.body, headers: Object.assign({ "X-Sentinel-Token": token }, o.json ? { "Content-Type": "application/json" } : {}) });
+  if (o.raw) return res;
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((data && data.error) || `Request failed (${res.status})`);
+  return data;
+}
+function toast(text) { const t = $("toast"); t.textContent = text; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2600); }
+
+// ── navigation ──
+function show(view) {
+  for (const b of $("nav").querySelectorAll("button")) b.classList.toggle("on", b.dataset.view === view);
+  for (const s of document.querySelectorAll(".view")) s.classList.toggle("on", s.id === "view-" + view);
+  if (view === "history") loadHistory();
+  if (view === "rules") loadRules();
+}
+$("nav").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.view); });
+
+// ── scanning ──
+let busy = false;
+function scanError(msg) { const e = $("scan-err"); e.textContent = msg || ""; e.classList.toggle("on", !!msg); }
+function setBusy(on, title) {
+  busy = on;
+  $("progress").classList.toggle("on", on);
+  for (const id of ["scan-path", "scan-sample"]) $(id).disabled = on;
+  if (on) { $("p-title").textContent = title; $("p-events").textContent = "0"; $("p-rate").textContent = "0"; $("p-time").textContent = "0.0 s"; }
+}
+async function follow(job) {
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 250));
+    const s = await api("/api/job/" + job.id);
+    $("p-events").textContent = fmt(s.events);
+    $("p-rate").textContent = fmt(s.rate);
+    $("p-time").textContent = s.elapsed.toFixed(1) + " s";
+    if (s.status === "error") throw new Error(s.error || "Scan failed");
+    if (s.status === "done") return api(`/api/job/${job.id}/result`);
+  }
+}
+async function runScan(title, start) {
+  if (busy) return;
+  scanError("");
+  setBusy(true, "Analyzing " + title + "…");
+  try {
+    const result = await follow(await start());
+    renderResults(result);
+    show("results");
+  } catch (err) { scanError(err.message); }
+  finally { setBusy(false); }
+}
+const aiFlag = () => ($("use-ai").checked ? "1" : "0");
+function scanFile(file) {
+  if (!file) return;
+  runScan(file.name, () => api(`/api/upload?name=${encodeURIComponent(file.name)}&ai=${aiFlag()}`, { method: "POST", body: file }));
+}
+$("drop").addEventListener("click", () => $("file").click());
+$("drop").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+$("file").addEventListener("change", (e) => { scanFile(e.target.files[0]); e.target.value = ""; });
+for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); });
+$("drop").addEventListener("drop", (e) => scanFile(e.dataTransfer.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
+function scanPath() {
+  const path = $("path").value.trim();
+  if (!path) { scanError("Enter the path of a log file, or drop a file above."); return; }
+  runScan(path, () => api("/api/scan", { method: "POST", json: true, body: JSON.stringify({ path, ai: $("use-ai").checked }) }));
+}
+$("scan-path").addEventListener("click", scanPath);
+$("path").addEventListener("keydown", (e) => { if (e.key === "Enter") scanPath(); });
+$("scan-sample").addEventListener("click", () => runScan("the sample log", () => api("/api/scan-sample", { method: "POST", json: true, body: "{}" })));
+
+// ── alert table (shared by results and history) ──
+function alertTable(alerts, total, openDetail) {
+  const state = { level: "", q: "", shown: 100 };
+  const body = el("tbody");
+  const more = el("div", { class: "more" });
+  const counts = {};
+  for (const a of alerts) counts[a.risk.level] = (counts[a.risk.level] || 0) + 1;
+  const chips = el("div", { class: "tools" });
+  const search = el("input", { type: "search", placeholder: "Filter by IP, user, rule…", "aria-label": "Filter alerts" });
+  function matches(a) {
+    if (state.level && a.risk.level !== state.level) return false;
+    if (!state.q) return true;
+    return [a.title, a.rule_id, a.rule_name, a.ip, a.user, a.hostname].some((v) => v && String(v).toLowerCase().includes(state.q));
+  }
+  function draw() {
+    const rows = alerts.filter(matches);
+    body.replaceChildren(...rows.slice(0, state.shown).map((a) => el("tr", { class: "click", onclick: () => openDetail(a) },
+      el("td", {}, lvl(a.risk.level)),
+      el("td", { class: "num score", style: "color:" + color(a.risk.level), text: Math.round(a.risk.score) }),
+      el("td", { class: "mono", text: a.rule_id }),
+      el("td", { text: a.title }),
+      el("td", { class: "mono", text: a.ip || "–" }),
+      el("td", { class: "mono", text: a.user || "–" }),
+      el("td", { class: "num", text: fmt(a.event_count) }),
+      el("td", { class: "mono", text: when(a.last_seen).slice(0, 16) }))));
+    if (!rows.length) body.append(el("tr", {}, el("td", { colspan: "8", class: "empty", text: "No alerts match this filter." })));
+    more.replaceChildren();
+    if (rows.length > state.shown) more.append(el("button", { class: "btn", text: `Show more (${fmt(rows.length - state.shown)} left)`, onclick: () => { state.shown += 200; draw(); } }));
+    else if (total > alerts.length && !state.level && !state.q) more.append(el("span", { style: "color:var(--muted)", text: `Showing the ${fmt(alerts.length)} highest-risk alerts of ${fmt(total)}. Export the report for the full list.` }));
+  }
+  function chip(label, value) {
+    const c = el("button", { class: "chip" + (state.level === value ? " on" : ""), text: label, onclick: () => { state.level = value; state.shown = 100; for (const x of chips.querySelectorAll(".chip")) x.classList.remove("on"); c.classList.add("on"); draw(); } });
+    return c;
+  }
+  chips.append(chip(`All ${fmt(alerts.length)}`, ""));
+  for (const name of LEVELS) if (counts[name]) chips.append(chip(`${name} ${fmt(counts[name])}`, name));
+  search.addEventListener("input", () => { state.q = search.value.trim().toLowerCase(); state.shown = 100; draw(); });
+  chips.append(search);
+  draw();
+  return el("div", {}, chips, el("div", { class: "tablewrap" }, el("table", {},
+    el("thead", {}, el("tr", {}, ...["Risk", "Score", "Rule", "What happened", "Source IP", "User", "Events", "Last seen"].map((t, i) => el("th", { text: t, style: i === 1 || i === 6 ? "text-align:right" : null })))),
+    body), more));
+}
+
+// ── results ──
+let current = null;
+function incidentCard(inc) {
+  const chain = el("div", { class: "chain" });
+  (inc.stages || []).forEach((s, i) => { if (i) chain.append(el("i", { text: "→" })); chain.append(el("span", { text: s })); });
+  return el("div", { class: "card incident" },
+    el("div", { class: "top" }, lvl(inc.level), el("b", { text: inc.title }), el("span", { class: "score", style: "color:" + color(inc.level), text: Math.round(inc.score) + " / 100" })),
+    chain,
+    inc.summary ? el("p", { text: inc.summary }) : null,
+    el("p", { class: "mono", text: [`${fmt(inc.alert_count)} alerts`, (inc.ips || []).slice(0, 4).join(", "), (inc.users || []).slice(0, 4).join(", "), when(inc.first_seen).slice(0, 16) + " → " + when(inc.last_seen).slice(0, 16)].filter(Boolean).join("  ·  ") }));
+}
+function ranked(items, key) {
+  const max = Math.max(1, ...items.map((i) => i.alerts));
+  return items.length ? items.map((i) => el("div", { class: "rank" }, el("code", { text: i[key], title: i[key] }), el("div", { class: "t" }, el("i", { style: `width:${(i.alerts / max) * 100}%` })), el("span", { class: "v", text: fmt(i.alerts) }))) : [el("span", { style: "color:var(--muted)", text: "Nothing to show." })];
+}
+function renderResults(res) {
+  current = res;
+  const r = res.report, s = r.summary, by = s.alerts_by_level || {};
+  const total = s.alerts_total || 0;
+  const worst = LEVELS.find((l) => by[l]) || "";
+  const verdicts = {
+    critical: ["Critical findings", "At least one alert needs attention now. Start with the highest score."],
+    high: ["High-risk findings", "Review these alerts soon."],
+    medium: ["Medium-risk findings", "Nothing urgent, but worth a look."],
+    low: ["Low-risk findings", "Only minor findings in this log."],
+    informational: ["Informational findings", "Nothing that needs action."],
+    "": ["No threats detected", "No rule matched in this log. That is good news, not a guarantee."],
+  };
+  const dist = el("div", { class: "dist" }), legend = el("div", { class: "legend" });
+  for (const name of LEVELS) if (by[name]) {
+    dist.append(el("i", { style: `width:${(by[name] / total) * 100}%;background:${color(name)}`, title: `${name}: ${by[name]}` }));
+    legend.append(el("span", {}, el("i", { style: "background:" + color(name) }), `${name} ${fmt(by[name])}`));
+  }
+  const patterns = r.attack_patterns || [], incidents = r.incidents || [], recs = r.recommendations || [];
+  const body = $("results-body");
+  put(body,
+    el("div", { class: "head" },
+      el("div", { class: "grow" }, el("h1", { text: "Scan results" }), el("div", { class: "src", text: res.source, title: res.source })),
+      el("button", { class: "btn", text: "Export HTML report", onclick: exportReport }),
+      el("button", { class: "btn primary", text: "New scan", onclick: () => show("scan") })),
+    el("div", { class: "verdict" }, el("span", { class: "dot", style: "background:" + (worst ? color(worst) : "var(--accent)") }), el("div", {}, el("b", { text: verdicts[worst][0] }), el("span", { text: verdicts[worst][1] }))),
+    el("div", { class: "stats" },
+      el("div", { class: "stat" }, el("b", { text: fmt(s.events_analyzed) }), el("span", { text: "events analyzed" })),
+      el("div", { class: "stat" }, el("b", { text: fmt(res.rate) }), el("span", { text: `events / second · ${res.elapsed < 0.1 ? "< 0.1" : res.elapsed.toFixed(1)} s` })),
+      el("div", { class: "stat" }, el("b", { text: fmt(total), style: worst ? "color:" + color(worst) : null }), el("span", { text: "alerts" })),
+      el("div", { class: "stat" }, el("b", { text: fmt(incidents.length) }), el("span", { text: "incidents" })),
+      el("div", { class: "stat" }, el("b", { text: fmt(s.unique_source_ips) }), el("span", { text: "source IPs seen" }))),
+    total ? el("div", {}, dist, legend) : null,
+    patterns.length ? el("div", {}, el("h2", {}, "Attack patterns", el("span", { class: "n", text: patterns.length })), el("div", { class: "card" }, patterns.map((p) => el("div", { class: "pattern" }, el("b", {}, p.name, el("em", { text: `confidence ${Math.round((p.confidence || 0) * 100)}%` })), el("span", { text: p.description }))))) : null,
+    incidents.length ? el("div", {}, el("h2", {}, "Incidents", el("span", { class: "n", text: incidents.length })), incidents.slice(0, 20).map(incidentCard)) : null,
+    total ? el("div", { class: "two", style: "margin-top:26px" },
+      el("div", { class: "card" }, el("h2", { style: "margin-top:0", text: "Top source IPs" }), ranked(s.top_source_ips || [], "ip")),
+      el("div", { class: "card" }, el("h2", { style: "margin-top:0", text: "Most targeted users" }), ranked(s.top_targeted_users || [], "user"))) : null,
+    recs.length ? el("div", {}, el("h2", { text: "Recommended next steps" }), el("div", { class: "card" }, el("ul", { class: "recs" }, recs.map((t) => el("li", { text: t }))))) : null,
+    total ? el("div", {}, el("h2", {}, "Alerts", el("span", { class: "n", text: fmt(total) })), alertTable(res.alerts, res.alerts_total, async (a) => { try { openDetail(await api(`/api/job/${res.id}/alert?i=${a.index}`)); } catch (err) { toast(err.message); } })) : null,
+    s.time_range && s.time_range.start ? el("p", { class: "lead", style: "margin-top:18px;font-size:.84rem", text: `Log covers ${when(s.time_range.start)} → ${when(s.time_range.end)}. Timestamps without a timezone are read as UTC.` }) : null);
+  body.hidden = false;
+  $("results-empty").hidden = true;
+  const badge = $("nav-results"); badge.hidden = false; badge.textContent = fmt(total);
+}
+async function exportReport() {
+  if (!current) return;
+  try {
+    const res = await api(`/api/job/${current.id}/report.html`, { raw: true });
+    if (!res.ok) throw new Error("Could not build the report");
+    const url = URL.createObjectURL(await res.blob());
+    const a = el("a", { href: url, download: "sentinelai-report.html" });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast("Report saved to your downloads");
+  } catch (err) { toast(err.message); }
+}
+
+// ── detail drawer ──
+function closeDrawer() { $("drawer").classList.remove("on"); $("shade").classList.remove("on"); $("drawer").setAttribute("aria-hidden", "true"); }
+$("drawer-x").addEventListener("click", closeDrawer);
+$("shade").addEventListener("click", closeDrawer);
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+function openDetail(a) {
+  $("drawer-head").replaceChildren(el("div", { style: "display:flex;gap:8px;align-items:center" }, lvl(a.risk.level), el("span", { class: "mono", style: "color:var(--muted)", text: a.rule_id + " · " + a.rule_name })), el("h3", { text: a.title }));
+  const kv = el("div", { class: "kv" });
+  const add = (k, v) => { if (v !== null && v !== undefined && v !== "") kv.append(el("span", { text: k }), el("b", { class: "mono", text: v })); };
+  add("Source IP", a.ip); add("User", a.user); add("Host", a.hostname); add("Port", a.port);
+  add("Events", fmt(a.event_count)); add("First seen", when(a.first_seen)); add("Last seen", when(a.last_seen)); add("Category", a.category);
+  const factors = (a.risk.factors || []).map((f) => el("div", { class: "factor" }, el("span", { class: "p" + (f.points < 0 ? " neg" : ""), text: (f.points > 0 ? "+" : "") + Math.round(f.points) }), el("div", {}, el("b", { text: f.name }), el("span", { text: f.reason }))));
+  const mitre = [...(a.mitre_tactics || []), ...(a.mitre_techniques || [])];
+  const events = a.sample_events || [];
+  const intel = a.intel && typeof a.intel === "object" ? Object.entries(a.intel).filter(([, v]) => ["string", "number", "boolean"].includes(typeof v) && v !== "") : [];
+  put($("drawer-body"),
+    el("h4", { text: "What happened" }), el("p", { text: a.description || a.title }),
+    el("h4", { text: `Risk score ${Math.round(a.risk.score)} / 100` }),
+    el("div", { class: "gauge" }, el("i", { style: `width:${Math.min(100, Math.max(0, a.risk.score))}%;background:${color(a.risk.level)}` })),
+    factors.length ? el("div", {}, factors) : el("p", { style: "color:var(--muted)", text: "No score factors recorded." }),
+    a.recommendation ? el("div", {}, el("h4", { text: "Recommended action" }), el("div", { class: "rec", text: a.recommendation })) : null,
+    el("h4", { text: "Details" }), kv,
+    mitre.length ? el("div", {}, el("h4", { text: "MITRE ATT&CK" }), el("div", { class: "tags" }, mitre.map((m) => el("span", { text: m })))) : null,
+    intel.length ? el("div", {}, el("h4", { text: "Threat intelligence" }), el("div", { class: "kv" }, intel.flatMap(([k, v]) => [el("span", { text: k.replace(/_/g, " ") }), el("b", { class: "mono", text: String(v) })]))) : null,
+    events.length ? el("div", {}, el("h4", { text: `Sample log lines (${events.length})` }), el("pre", { class: "ev", text: events.map((e) => `${when(e.timestamp).slice(0, 19)}  ${e.service || ""}  ${e.message}`).join("\n") })) : null);
+  $("drawer").classList.add("on"); $("shade").classList.add("on"); $("drawer").setAttribute("aria-hidden", "false");
+  $("drawer-body").scrollTop = 0;
+}
+
+// ── history and rules ──
+async function loadHistory() {
+  const box = $("history-body");
+  try {
+    const h = await api("/api/history");
+    const kids = [];
+    if (!h.alerts.length && !h.incidents.length) kids.push(el("div", { class: "empty" }, el("b", { text: "Nothing stored yet" }), "Alerts from your scans are kept here."));
+    if (h.incidents.length) kids.push(el("h2", {}, "Incidents", el("span", { class: "n", text: h.incidents.length })), ...h.incidents.slice(0, 15).map(incidentCard));
+    if (h.alerts.length) kids.push(el("h2", {}, "Recent alerts", el("span", { class: "n", text: h.alerts.length })), alertTable(h.alerts, h.alerts.length, openDetail));
+    box.replaceChildren(...kids);
+  } catch (err) { box.replaceChildren(el("div", { class: "err on", text: err.message })); }
+}
+$("history-refresh").addEventListener("click", loadHistory);
+let rulesLoaded = false;
+async function loadRules() {
+  if (rulesLoaded) return;
+  try {
+    const rules = await api("/api/rules");
+    $("rules-body").replaceChildren(el("div", { class: "tablewrap" }, el("table", {},
+      el("thead", {}, el("tr", {}, ...["ID", "Rule", "Category", "Severity", "MITRE"].map((t) => el("th", { text: t })))),
+      el("tbody", {}, rules.map((r) => el("tr", {}, el("td", { class: "mono", text: r.id }), el("td", {}, el("b", { text: r.name }), r.description ? el("div", { style: "color:var(--muted);font-size:.84rem", text: r.description }) : null), el("td", { text: r.category }), el("td", { text: r.severity }), el("td", { class: "mono", text: r.mitre.join(", ") || "–" })))))));
+    rulesLoaded = true;
+  } catch (err) { $("rules-body").replaceChildren(el("div", { class: "err on", text: err.message })); }
+}
+
+// ── start ──
+$("quit").addEventListener("click", async () => { try { await api("/api/quit", { method: "POST", json: true, body: "{}" }); } catch (e) {} document.body.replaceChildren(el("div", { class: "empty", style: "padding-top:30vh" }, el("b", { text: "SentinelAI has stopped" }), "You can close this window.")); window.close(); });
+(async () => {
+  try {
+    const info = await api("/api/info");
+    $("ver").textContent = `SentinelAI ${info.version} · ${info.platform}`;
+    $("use-ai").checked = info.ai_available; $("use-ai").disabled = !info.ai_available;
+    if (!info.ai_available) $("ai-label").textContent = "ML anomaly detection (not included in this build — rules still run)";
+    $("scan-sample").hidden = !info.sample_available;
+    const kv = $("about-kv");
+    for (const [k, v] of [["Version", info.version + " (beta)"], ["Platform", info.platform], ["Data folder", info.state_dir], ["Author", "E2xCoder"], ["License", "MIT"], ["Source", "github.com/E2xCoder/SentinelAI"]]) kv.append(el("span", { text: k }), el("b", { class: "mono", text: v }));
+    setInterval(() => { api("/api/ping").catch(() => {}); }, 5000);
+  } catch (err) {
+    scanError("Cannot reach the SentinelAI service. Close this window and start SentinelAI again. (" + err.message + ")");
+  }
+})();
+</script>
+</body>
+</html>

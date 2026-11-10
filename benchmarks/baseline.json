@@ -1414,7 +1414,7 @@
     }
   ],
   "schema_version": 1,
-  "sentinelai_version": "0.1.0",
+  "sentinelai_version": "0.2.0",
   "summary": {
     "attack_recall": 1.0,
     "attack_scenarios": 29,

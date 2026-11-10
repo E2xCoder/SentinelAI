@@ -8,6 +8,20 @@ While the version is 0.x, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+### Added
+
+- **Desktop interface** (`sentinel gui`, and the `SentinelAI` program in the
+  packaged builds). Drop a log file into the window to scan it; results show the
+  verdict, speed, attack patterns, incidents, top sources and a filterable alert
+  table with the full risk explanation per alert. History, rule list and HTML
+  report export are included. The interface is served from 127.0.0.1 only,
+  protected by a per-run token and a Host check, and is read-only: scans started
+  there always run with response disabled and the `dry_run` adapter.
+- Packaged builds now contain two programs: `SentinelAI` (windowed) and
+  `sentinel` (command line). macOS ships as `SentinelAI.app`.
+
 ## [0.1.1] - 2026-11-09
 
 First packaged release (Linux, Windows, macOS binaries) plus the real-world validation fixes listed below.
